@@ -1,4 +1,8 @@
-# Nuvio Plugin & Stremio Addon
+# Nuvio tv plugins
+
+> Fork di **[realbestia1/easystreams](https://github.com/realbestia1/easystreams)**.
+> Il codice dei provider è opera dell'autore originale, distribuito con licenza ISC.
+> Questo repository ne mantiene una copia personale con eventuali modifiche.
 
 Questo repository contiene una collezione di provider italiani per lo streaming di Film, Serie TV e Anime.
 Il progetto è progettato per essere versatile e può essere utilizzato in due modi diversi:
@@ -31,7 +35,7 @@ Per installare i provider su Nuvio, basta seguire questi semplici passaggi:
 2.  Vai nelle **Impostazioni** > **Plugin**.
 3.  Incolla il seguente link nel campo apposito per aggiungere un plugin esterno:
     ```text
-    https://raw.githubusercontent.com/realbestia1/easystreams/refs/heads/main/manifest.json
+    https://raw.githubusercontent.com/brusus/Nuvio-tv-plugins/refs/heads/main/manifest.json
     ```
 4.  I provider saranno immediatamente attivi.
 
