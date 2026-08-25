@@ -548,6 +548,7 @@ function getStreams(id, type, season, episode, providerContext = null) {
     candidates = candidates.map((c) => Object.assign({}, c, { score: scoreCandidate(c, wantedTitle, info.year) })).filter((c) => c.score > 0).sort((a, b) => b.score - a.score).slice(0, MAX_CANDIDATES);
     if (!candidates.length) return [];
     let pageHtml = null;
+    let fallbackHtml = null;
     for (const candidate of candidates) {
       const html = yield httpGet(candidate.url, { "Referer": `${BASE_URL}/` });
       if (!html) continue;
@@ -555,11 +556,9 @@ function getStreams(id, type, season, episode, providerContext = null) {
         pageHtml = html;
         break;
       }
-      if (!info.imdbId && candidate.score >= 10) {
-        pageHtml = html;
-        break;
-      }
+      if (!fallbackHtml && candidate.score >= 10) fallbackHtml = html;
     }
+    if (!pageHtml) pageHtml = fallbackHtml;
     if (!pageHtml) return [];
     const links = collectLinksWithSection(pageHtml);
     if (!links.length) return [];

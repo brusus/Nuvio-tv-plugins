@@ -306,15 +306,23 @@ async function getStreams(id, type, season, episode, providerContext = null) {
     .slice(0, MAX_CANDIDATES);
   if (!candidates.length) return [];
 
-  // Confirm the page really is the wanted movie: CB01 links the imdb entry,
-  // which beats fuzzy title matching on remakes and same-name releases.
-  let pageHtml = null;
+  // Pick the page in two passes. Only a minority of CB01 entries link their
+  // imdb page, so treating that as mandatory would discard most matches: it is
+  // used as confirmation when present, not as a requirement.
+  let pageHtml = null;      // confirmed by imdb id
+  let fallbackHtml = null;  // best exact title match seen so far
+
   for (const candidate of candidates) {
     const html = await httpGet(candidate.url, { 'Referer': `${BASE_URL}/` });
     if (!html) continue;
+
     if (info.imdbId && html.indexOf(info.imdbId) !== -1) { pageHtml = html; break; }
-    if (!info.imdbId && candidate.score >= 10) { pageHtml = html; break; }
+    // candidates are sorted by score, so the first one reaching the exact-title
+    // threshold is the best available fallback
+    if (!fallbackHtml && candidate.score >= 10) fallbackHtml = html;
   }
+
+  if (!pageHtml) pageHtml = fallbackHtml;
   if (!pageHtml) return [];
 
   const links = collectLinksWithSection(pageHtml);
