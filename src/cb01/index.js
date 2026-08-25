@@ -1,4 +1,5 @@
 const { formatStream } = require('../formatter.js');
+const { getQualityFromUrl } = require('../quality_helper.js');
 
 const TMDB_API_KEY = '68e094699525b18a70bab2f86b1fa706';
 const BASE_URL = 'https://cb01uno.monster';
@@ -10,6 +11,11 @@ const MAX_CANDIDATES = 5;
 // CB01 exposes two link families. Only stayonline is usable here: uprot serves an
 // interactive captcha that a sandboxed plugin has no way to solve.
 const STAYONLINE_RE = /https?:\/\/stayonline\.pro\/l\/[A-Za-z0-9]+\/?/g;
+
+// The page groups its links under "Streaming:" and "Streaming HD:" headings.
+// That is the site's own classification, not a measured resolution, but it is
+// the only quality signal available before resolving the link.
+const SECTION_RE = /<strong>\s*Streaming(\s*HD)?\s*:?\s*<\/strong>/gi;
 
 function timeoutSignal(ms) {
   try {
@@ -229,6 +235,35 @@ async function extractMixDrop(embedUrl) {
   };
 }
 
+// Pair every stayonline link with the heading it sits under, by comparing
+// positions in the raw html: the last heading before a link is its section.
+function collectLinksWithSection(html) {
+  const sections = [];
+  let s;
+  SECTION_RE.lastIndex = 0;
+  while ((s = SECTION_RE.exec(html)) !== null) {
+    sections.push({ index: s.index, hd: Boolean(s[1]) });
+  }
+
+  const found = [];
+  const seen = new Set();
+  let m;
+  STAYONLINE_RE.lastIndex = 0;
+  while ((m = STAYONLINE_RE.exec(html)) !== null) {
+    const url = m[0];
+    if (seen.has(url)) continue;
+    seen.add(url);
+
+    let hd = false;
+    for (const section of sections) {
+      if (section.index < m.index) hd = section.hd;
+      else break;
+    }
+    found.push({ url, hd });
+  }
+  return found;
+}
+
 // m1xdrop is an alias domain; the embed lives on the canonical one.
 function toMixDropEmbed(rawUrl) {
   const url = String(rawUrl || '');
@@ -282,12 +317,12 @@ async function getStreams(id, type, season, episode, providerContext = null) {
   }
   if (!pageHtml) return [];
 
-  const links = Array.from(new Set(pageHtml.match(STAYONLINE_RE) || []));
+  const links = collectLinksWithSection(pageHtml);
   if (!links.length) return [];
 
   const streams = [];
   for (const link of links) {
-    const resolved = await resolveStayOnline(link);
+    const resolved = await resolveStayOnline(link.url);
     if (!resolved) continue;
 
     const embed = toMixDropEmbed(resolved);
@@ -298,12 +333,16 @@ async function getStreams(id, type, season, episode, providerContext = null) {
 
     if (streams.some(s => s.url === media.url)) continue;
 
+    // A resolution in the final url beats the site's own label; fall back to
+    // the section heading, which at least separates HD from the rest.
+    const quality = getQualityFromUrl(media.url) || (link.hd ? '1080p' : '720p');
+
     streams.push({
-      name: 'CB01 - MixDrop',
+      name: link.hd ? 'CB01 - MixDrop HD' : 'CB01 - MixDrop',
       title: info.year ? `${info.title} (${info.year})` : info.title,
       url: media.url,
       headers: media.headers,
-      quality: 'unknown',
+      quality: quality,
       type: 'direct',
       language: 'Italian',
       behaviorHints: {
@@ -316,4 +355,5 @@ async function getStreams(id, type, season, episode, providerContext = null) {
   return streams.map(s => formatStream(s, 'CB01')).filter(Boolean);
 }
 
-module.exports = { getStreams };
+// collectLinksWithSection is exported for local testing; Nuvio only calls getStreams.
+module.exports = { getStreams, collectLinksWithSection };

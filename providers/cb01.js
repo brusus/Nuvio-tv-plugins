@@ -18,6 +18,18 @@ var __spreadValues = (a, b) => {
   return a;
 };
 var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+var __objRest = (source, exclude) => {
+  var target = {};
+  for (var prop in source)
+    if (__hasOwnProp.call(source, prop) && exclude.indexOf(prop) < 0)
+      target[prop] = source[prop];
+  if (source != null && __getOwnPropSymbols)
+    for (var prop of __getOwnPropSymbols(source)) {
+      if (exclude.indexOf(prop) < 0 && __propIsEnum.call(source, prop))
+        target[prop] = source[prop];
+    }
+  return target;
+};
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
@@ -176,14 +188,134 @@ var require_formatter = __commonJS({
   }
 });
 
+// src/fetch_helper.js
+var require_fetch_helper = __commonJS({
+  "src/fetch_helper.js"(exports2, module2) {
+    var FETCH_TIMEOUT = 3e4;
+    function createTimeoutSignal(timeoutMs) {
+      const parsed = Number.parseInt(String(timeoutMs), 10);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        return { signal: void 0, cleanup: null, timed: false };
+      }
+      if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+        return { signal: AbortSignal.timeout(parsed), cleanup: null, timed: true };
+      }
+      if (typeof AbortController !== "undefined" && typeof setTimeout === "function") {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+        }, parsed);
+        return {
+          signal: controller.signal,
+          cleanup: () => clearTimeout(timeoutId),
+          timed: true
+        };
+      }
+      return { signal: void 0, cleanup: null, timed: false };
+    }
+    function fetchWithTimeout(_0) {
+      return __async(this, arguments, function* (url, options = {}) {
+        if (typeof fetch === "undefined") {
+          throw new Error("No fetch implementation found!");
+        }
+        const _a = options, { timeout } = _a, fetchOptions = __objRest(_a, ["timeout"]);
+        const requestTimeout = timeout || FETCH_TIMEOUT;
+        const timeoutConfig = createTimeoutSignal(requestTimeout);
+        const requestOptions = __spreadValues({}, fetchOptions);
+        if (timeoutConfig.signal) {
+          if (requestOptions.signal && typeof AbortSignal !== "undefined" && typeof AbortSignal.any === "function") {
+            requestOptions.signal = AbortSignal.any([requestOptions.signal, timeoutConfig.signal]);
+          } else if (!requestOptions.signal) {
+            requestOptions.signal = timeoutConfig.signal;
+          }
+        }
+        try {
+          const response = yield fetch(url, requestOptions);
+          return response;
+        } catch (error) {
+          if (error && error.name === "AbortError" && timeoutConfig.timed) {
+            throw new Error(`Request to ${url} timed out after ${requestTimeout}ms`);
+          }
+          throw error;
+        } finally {
+          if (typeof timeoutConfig.cleanup === "function") {
+            timeoutConfig.cleanup();
+          }
+        }
+      });
+    }
+    module2.exports = { fetchWithTimeout, createTimeoutSignal };
+  }
+});
+
+// src/quality_helper.js
+var require_quality_helper = __commonJS({
+  "src/quality_helper.js"(exports2, module2) {
+    var { createTimeoutSignal } = require_fetch_helper();
+    var USER_AGENT2 = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36";
+    function checkQualityFromText(text) {
+      if (!text) return null;
+      if (/RESOLUTION=\d+x2160/i.test(text) || /RESOLUTION=2160/i.test(text)) return "4K";
+      if (/RESOLUTION=\d+x1440/i.test(text) || /RESOLUTION=1440/i.test(text)) return "1440p";
+      if (/RESOLUTION=\d+x1080/i.test(text) || /RESOLUTION=1080/i.test(text)) return "1080p";
+      if (/RESOLUTION=\d+x720/i.test(text) || /RESOLUTION=720/i.test(text)) return "720p";
+      if (/RESOLUTION=\d+x480/i.test(text) || /RESOLUTION=480/i.test(text)) return "480p";
+      return null;
+    }
+    function checkQualityFromPlaylist(_0) {
+      return __async(this, arguments, function* (url, headers = {}) {
+        try {
+          const finalHeaders = __spreadValues({}, headers);
+          if (!finalHeaders["User-Agent"]) finalHeaders["User-Agent"] = USER_AGENT2;
+          const timeoutConfig = createTimeoutSignal(3e3);
+          try {
+            const response = yield fetch(url, {
+              headers: finalHeaders,
+              signal: timeoutConfig.signal
+            });
+            if (!response.ok) return null;
+            const text = yield response.text();
+            if (!text.startsWith("#EXTM3U")) return null;
+            const quality = checkQualityFromText(text);
+            if (quality) console.log(`[QualityHelper] Detected ${quality} from playlist: ${url}`);
+            return quality;
+          } finally {
+            if (typeof timeoutConfig.cleanup === "function") timeoutConfig.cleanup();
+          }
+        } catch (_) {
+          return null;
+        }
+      });
+    }
+    function getQualityFromUrl2(url) {
+      if (!url) return null;
+      const urlPath = url.split("?")[0].toLowerCase();
+      if (urlPath.includes("4k") || urlPath.includes("2160")) return "4K";
+      if (urlPath.includes("1440") || urlPath.includes("2k")) return "1440p";
+      if (urlPath.includes("1080") || urlPath.includes("fhd")) return "1080p";
+      if (urlPath.includes("720") || urlPath.includes("hd")) return "720p";
+      if (urlPath.includes("480") || urlPath.includes("sd")) return "480p";
+      if (urlPath.includes("360")) return "360p";
+      return null;
+    }
+    module2.exports = {
+      checkQualityFromPlaylist,
+      getQualityFromUrl: getQualityFromUrl2,
+      checkQualityFromText
+    };
+  }
+});
+
 // src/cb01/index.js
 var { formatStream } = require_formatter();
+var { getQualityFromUrl } = require_quality_helper();
 var TMDB_API_KEY = "68e094699525b18a70bab2f86b1fa706";
 var BASE_URL = "https://cb01uno.monster";
 var USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 var REQUEST_TIMEOUT_MS = 15e3;
 var MAX_CANDIDATES = 5;
 var STAYONLINE_RE = /https?:\/\/stayonline\.pro\/l\/[A-Za-z0-9]+\/?/g;
+var SECTION_RE = /<strong>\s*Streaming(\s*HD)?\s*:?\s*<\/strong>/gi;
 function timeoutSignal(ms) {
   try {
     const controller = new AbortController();
@@ -364,6 +496,30 @@ function extractMixDrop(embedUrl) {
     };
   });
 }
+function collectLinksWithSection(html) {
+  const sections = [];
+  let s;
+  SECTION_RE.lastIndex = 0;
+  while ((s = SECTION_RE.exec(html)) !== null) {
+    sections.push({ index: s.index, hd: Boolean(s[1]) });
+  }
+  const found = [];
+  const seen = /* @__PURE__ */ new Set();
+  let m;
+  STAYONLINE_RE.lastIndex = 0;
+  while ((m = STAYONLINE_RE.exec(html)) !== null) {
+    const url = m[0];
+    if (seen.has(url)) continue;
+    seen.add(url);
+    let hd = false;
+    for (const section of sections) {
+      if (section.index < m.index) hd = section.hd;
+      else break;
+    }
+    found.push({ url, hd });
+  }
+  return found;
+}
 function toMixDropEmbed(rawUrl) {
   const url = String(rawUrl || "");
   const alias = url.match(/m1xdrop\.net\/f\/([A-Za-z0-9]+)/);
@@ -405,23 +561,24 @@ function getStreams(id, type, season, episode, providerContext = null) {
       }
     }
     if (!pageHtml) return [];
-    const links = Array.from(new Set(pageHtml.match(STAYONLINE_RE) || []));
+    const links = collectLinksWithSection(pageHtml);
     if (!links.length) return [];
     const streams = [];
     for (const link of links) {
-      const resolved = yield resolveStayOnline(link);
+      const resolved = yield resolveStayOnline(link.url);
       if (!resolved) continue;
       const embed = toMixDropEmbed(resolved);
       if (!embed) continue;
       const media = yield extractMixDrop(embed);
       if (!media) continue;
       if (streams.some((s) => s.url === media.url)) continue;
+      const quality = getQualityFromUrl(media.url) || (link.hd ? "1080p" : "720p");
       streams.push({
-        name: "CB01 - MixDrop",
+        name: link.hd ? "CB01 - MixDrop HD" : "CB01 - MixDrop",
         title: info.year ? `${info.title} (${info.year})` : info.title,
         url: media.url,
         headers: media.headers,
-        quality: "unknown",
+        quality,
         type: "direct",
         language: "Italian",
         behaviorHints: {
@@ -433,4 +590,4 @@ function getStreams(id, type, season, episode, providerContext = null) {
     return streams.map((s) => formatStream(s, "CB01")).filter(Boolean);
   });
 }
-module.exports = { getStreams };
+module.exports = { getStreams, collectLinksWithSection };
