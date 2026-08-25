@@ -370,7 +370,7 @@ try {
 } catch (_) {
   ProxyAgent = null;
 }
-var SC_BASE = "https://streamingcommunityz.systems";
+var SC_BASE = "https://streamingcommunityz.review";
 var _sitemapCache = null;
 var _sitemapPromise = null;
 function getSitemap() {
