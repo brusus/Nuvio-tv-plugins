@@ -13,7 +13,7 @@
       "idPrefixes": ["tt", "tmdb:", "kitsu:", "mal:", "anilist:", "anidb:"],
       "filename": "providers/pcc.js",
       "supportedTypes": ["movie", "tv", "series"],
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "easystreams-guardoserie",
