@@ -562,27 +562,36 @@ function getStreams(id, type, season, episode, providerContext = null) {
     if (!pageHtml) return [];
     const links = collectLinksWithSection(pageHtml);
     if (!links.length) return [];
+    const resolvedLinks = yield Promise.all(links.map((link) => __async(null, null, function* () {
+      try {
+        const resolved = yield resolveStayOnline(link.url);
+        if (!resolved) return null;
+        const embed = toMixDropEmbed(resolved);
+        if (!embed) return null;
+        const media = yield extractMixDrop(embed);
+        if (!media) return null;
+        return { link, media };
+      } catch (_) {
+        return null;
+      }
+    })));
     const streams = [];
-    for (const link of links) {
-      const resolved = yield resolveStayOnline(link.url);
-      if (!resolved) continue;
-      const embed = toMixDropEmbed(resolved);
-      if (!embed) continue;
-      const media = yield extractMixDrop(embed);
-      if (!media) continue;
-      if (streams.some((s) => s.url === media.url)) continue;
-      const quality = getQualityFromUrl(media.url) || (link.hd ? "1080p" : "720p");
+    const seenUrls = /* @__PURE__ */ new Set();
+    for (const entry of resolvedLinks) {
+      if (!entry || seenUrls.has(entry.media.url)) continue;
+      seenUrls.add(entry.media.url);
+      const quality = getQualityFromUrl(entry.media.url) || (entry.link.hd ? "1080p" : "720p");
       streams.push({
-        name: link.hd ? "CB01 - MixDrop HD" : "CB01 - MixDrop",
+        name: entry.link.hd ? "CB01 - MixDrop HD" : "CB01 - MixDrop",
         title: info.year ? `${info.title} (${info.year})` : info.title,
-        url: media.url,
-        headers: media.headers,
+        url: entry.media.url,
+        headers: entry.media.headers,
         quality,
         type: "direct",
         language: "Italian",
         behaviorHints: {
           notWebReady: true,
-          proxyHeaders: { request: media.headers }
+          proxyHeaders: { request: entry.media.headers }
         }
       });
     }

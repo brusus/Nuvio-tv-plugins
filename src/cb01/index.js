@@ -328,34 +328,48 @@ async function getStreams(id, type, season, episode, providerContext = null) {
   const links = collectLinksWithSection(pageHtml);
   if (!links.length) return [];
 
+  // Each link costs three round trips (stayonline page, ajax resolve, embed).
+  // Resolving them in parallel turns the total from the sum of the chains into
+  // the length of the slowest one; a dead link no longer delays the others.
+  const resolvedLinks = await Promise.all(links.map(async (link) => {
+    try {
+      const resolved = await resolveStayOnline(link.url);
+      if (!resolved) return null;
+
+      const embed = toMixDropEmbed(resolved);
+      if (!embed) return null;
+
+      const media = await extractMixDrop(embed);
+      if (!media) return null;
+
+      return { link, media };
+    } catch (_) {
+      return null;   // one broken link must not sink the whole batch
+    }
+  }));
+
   const streams = [];
-  for (const link of links) {
-    const resolved = await resolveStayOnline(link.url);
-    if (!resolved) continue;
+  const seenUrls = new Set();
 
-    const embed = toMixDropEmbed(resolved);
-    if (!embed) continue;
-
-    const media = await extractMixDrop(embed);
-    if (!media) continue;
-
-    if (streams.some(s => s.url === media.url)) continue;
+  for (const entry of resolvedLinks) {
+    if (!entry || seenUrls.has(entry.media.url)) continue;
+    seenUrls.add(entry.media.url);
 
     // A resolution in the final url beats the site's own label; fall back to
     // the section heading, which at least separates HD from the rest.
-    const quality = getQualityFromUrl(media.url) || (link.hd ? '1080p' : '720p');
+    const quality = getQualityFromUrl(entry.media.url) || (entry.link.hd ? '1080p' : '720p');
 
     streams.push({
-      name: link.hd ? 'CB01 - MixDrop HD' : 'CB01 - MixDrop',
+      name: entry.link.hd ? 'CB01 - MixDrop HD' : 'CB01 - MixDrop',
       title: info.year ? `${info.title} (${info.year})` : info.title,
-      url: media.url,
-      headers: media.headers,
+      url: entry.media.url,
+      headers: entry.media.headers,
       quality: quality,
       type: 'direct',
       language: 'Italian',
       behaviorHints: {
         notWebReady: true,
-        proxyHeaders: { request: media.headers }
+        proxyHeaders: { request: entry.media.headers }
       }
     });
   }
