@@ -118,6 +118,19 @@
       "filename": "providers/cinejoy.js",
       "supportedTypes": ["movie", "tv", "series"],
       "enabled": true
+    },
+    {
+      "id": "nuviotv-cb01",
+      "name": "CB01",
+      "version": "1.0.0",
+      "description": "Film da CB01 (solo film: le serie passano da uprot, che richiede un captcha)",
+      "resources": ["stream"],
+      "contentLanguage": ["it"],
+      "formats": ["mp4"],
+      "idPrefixes": ["tmdb:", "tt"],
+      "filename": "providers/cb01.js",
+      "supportedTypes": ["movie"],
+      "enabled": true
     }
   ]
 }
