@@ -104,19 +104,59 @@ function getSetting(settingName, envName) {
   }
 }
 
-// Gli abbonati ricevono un "dominio premium privato": se configurato si usa
-// quello, perche' e' l'host su cui la sessione a pagamento e' valida.
-function getSiteBase() {
+// Punto di partenza per la risoluzione del dominio: impostazione dell'utente
+// (dominio premium privato dell'abbonato) oppure il default.
+function getConfiguredBase() {
   const custom = getSetting('streamingcommunitySiteUrl', 'STREAMINGCOMMUNITY_SITE_URL');
   if (!custom) return SC_DEFAULT_SITE;
   const normalized = normalizeStreamingCommunityBaseUrl(custom);
   return normalized || SC_DEFAULT_SITE;
 }
 
+// Auto-guarigione del dominio. Questi siti cambiano indirizzo spesso e il
+// vecchio dominio in genere redirige al nuovo: si parte dal dominio noto, si
+// segue il redirect e si adotta l'indirizzo di arrivo per TUTTE le richieste
+// (login compreso, cosi' cookie/CSRF/sessione stanno sul dominio giusto).
+// Risolto una volta per esecuzione. Se il dominio e' irraggiungibile (morto
+// senza redirect) si resta sul noto: non c'e' un nuovo indirizzo da dedurre.
+let resolvedSiteBase = null;
+
+async function resolveLiveBase() {
+  if (resolvedSiteBase) return resolvedSiteBase;
+  const start = getConfiguredBase();
+  try {
+    const res = await fetch(start + "/", {
+      headers: { "User-Agent": USER_AGENT, "Accept-Language": "it-IT,it;q=0.9" }
+    });
+    // Serve solo l'URL finale dopo i redirect: il corpo si scarta.
+    if (res.body && typeof res.body.cancel === "function") res.body.cancel().catch(() => {});
+    if (res.ok && res.url) {
+      const origin = new URL(res.url).origin;
+      if (origin && origin !== start) {
+        console.log("[StreamingCommunity] Dominio spostato: " + start + " -> " + origin);
+      }
+      resolvedSiteBase = origin || start;
+    } else {
+      resolvedSiteBase = start;
+    }
+  } catch (_) {
+    resolvedSiteBase = start;
+  }
+  return resolvedSiteBase;
+}
+
+// Base effettiva per tutte le richieste al sito: il dominio risolto se
+// disponibile, altrimenti quello configurato.
+function getSiteBase() {
+  return resolvedSiteBase || getConfiguredBase();
+}
+
 // Sessione autenticata, risolta una volta sola per esecuzione.
 // Stringa vuota = nessun account configurato o login fallito.
 let scSessionCookie = null;
 let scSessionPromise = null;
+// Dominio per cui la sessione cachata e valida: se cambia, si rifa il login.
+let scSessionBase = null;
 
 function readCookieValue(jar, name) {
   const match = String(jar || "").match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
@@ -140,15 +180,18 @@ function mergeCookies(oldJar, newJar) {
 // Il sito e una applicazione Laravel con Sanctum: prima si raccolgono il
 // cookie di sessione e il token XSRF, poi si invia il form di accesso.
 async function ensureSession() {
-  if (scSessionCookie !== null) return scSessionCookie;
+  const base = getSiteBase();
+  // Cache valida solo se e per lo STESSO dominio: se il sito si e' spostato,
+  // il cookie del vecchio dominio non vale e va rifatto il login.
+  if (scSessionCookie !== null && scSessionBase === base) return scSessionCookie;
   if (scSessionPromise) return await scSessionPromise;
   if (!SC_ACCOUNT_EMAIL || !SC_ACCOUNT_PASSWORD) {
     scSessionCookie = "";
+    scSessionBase = base;
     return "";
   }
 
   scSessionPromise = (async () => {
-    const base = getSiteBase();
     try {
       const loginPage = await fetch(base + "/login", {
         headers: { "User-Agent": USER_AGENT, "Accept-Language": "it-IT,it;q=0.9" }
@@ -189,10 +232,16 @@ async function ensureSession() {
       // si ripiega in anonimo senza reinsistere (""); su errore server (5xx) si
       // lascia null cosi' che una chiamata successiva ritenti.
       if (!response.ok) {
-        scSessionCookie = response.status >= 500 ? null : "";
+        if (response.status >= 500) {
+          scSessionCookie = null;          // errore server: ritenta al prossimo giro
+        } else {
+          scSessionCookie = "";            // credenziali/CSRF rifiutati: anonimo
+          scSessionBase = base;
+        }
         return "";
       }
       scSessionCookie = jar;
+      scSessionBase = base;
       return jar;
     } catch (error) {
       console.warn("[StreamingCommunity] Login premium fallito, proseguo anonimo: " + error.message);
@@ -549,6 +598,7 @@ async function getMetadata(id, type) {
 }
 
 async function getStreams(id, type, season, episode, providerContext = null) {
+  await resolveLiveBase();
   await loadStreamingCommunityConfig();
   await ensureSession();
   const requestedType = String(type).toLowerCase();
