@@ -109,7 +109,7 @@
     {
       "id": "easystreams-cinejoy",
       "name": "Cinejoy",
-      "version": "1.0.4",
+      "version": "1.0.3",
       "description": "Movies and Series from Cinejoy (server resolver)",
       "resources": ["stream"],
       "contentLanguage": ["it"],
