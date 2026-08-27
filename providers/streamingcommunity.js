@@ -371,6 +371,8 @@ try {
   ProxyAgent = null;
 }
 var SC_DEFAULT_SITE = "https://streamingunity.vip";
+var SC_ACCOUNT_EMAIL = "rooting0001";
+var SC_ACCOUNT_PASSWORD = "N.kwbU7KUHsLpg6";
 function getSetting(settingName, envName) {
   try {
     const settings = typeof globalThis !== "undefined" && globalThis.SCRAPER_SETTINGS || {};
@@ -387,8 +389,85 @@ function getSiteBase() {
   const normalized = normalizeStreamingCommunityBaseUrl(custom);
   return normalized || SC_DEFAULT_SITE;
 }
+var scSessionCookie = null;
+var scSessionPromise = null;
+function readCookieValue(jar, name) {
+  const match = String(jar || "").match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+  if (!match) return "";
+  try {
+    return decodeURIComponent(match[1]);
+  } catch (_) {
+    return match[1];
+  }
+}
+function mergeCookies(oldJar, newJar) {
+  const jar = /* @__PURE__ */ new Map();
+  for (const part of [oldJar, newJar]) {
+    for (const piece of String(part || "").split("; ")) {
+      if (!piece) continue;
+      const eq = piece.indexOf("=");
+      if (eq > 0) jar.set(piece.slice(0, eq), piece.slice(eq + 1));
+    }
+  }
+  return Array.from(jar.entries()).map(([k, v]) => k + "=" + v).join("; ");
+}
+function ensureSession() {
+  return __async(this, null, function* () {
+    if (scSessionCookie !== null) return scSessionCookie;
+    if (scSessionPromise) return yield scSessionPromise;
+    if (!SC_ACCOUNT_EMAIL || !SC_ACCOUNT_PASSWORD) {
+      scSessionCookie = "";
+      return "";
+    }
+    scSessionPromise = (() => __async(null, null, function* () {
+      const base = getSiteBase();
+      try {
+        const loginPage = yield fetch(base + "/login", {
+          headers: { "User-Agent": USER_AGENT, "Accept-Language": "it-IT,it;q=0.9" }
+        });
+        let jar = getResponseCookies(loginPage);
+        const csrf = yield fetch(base + "/sanctum/csrf-cookie", {
+          headers: {
+            "User-Agent": USER_AGENT,
+            "Referer": base + "/",
+            "Cookie": jar,
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        jar = mergeCookies(jar, getResponseCookies(csrf));
+        const response = yield fetch(base + "/login", {
+          method: "POST",
+          headers: {
+            "User-Agent": USER_AGENT,
+            "Cookie": jar,
+            "X-XSRF-TOKEN": readCookieValue(jar, "XSRF-TOKEN"),
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": base + "/login",
+            "Origin": base,
+            "Accept": "application/json, text/plain, */*",
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+          },
+          body: "email=" + encodeURIComponent(SC_ACCOUNT_EMAIL) + "&password=" + encodeURIComponent(SC_ACCOUNT_PASSWORD)
+        });
+        jar = mergeCookies(jar, getResponseCookies(response));
+        console.log("[StreamingCommunity] Login premium: HTTP " + response.status);
+        scSessionCookie = jar;
+        return jar;
+      } catch (error) {
+        console.warn("[StreamingCommunity] Login premium fallito, proseguo anonimo: " + error.message);
+        scSessionCookie = "";
+        return "";
+      } finally {
+        scSessionPromise = null;
+      }
+    }))();
+    return yield scSessionPromise;
+  });
+}
 function getSiteCookie() {
-  return getSetting("streamingcommunityCookie", "STREAMINGCOMMUNITY_COOKIE");
+  const fromSettings = getSetting("streamingcommunityCookie", "STREAMINGCOMMUNITY_COOKIE");
+  if (fromSettings) return fromSettings;
+  return scSessionCookie || "";
 }
 function getSiteHeaders() {
   const headers = {
@@ -717,6 +796,7 @@ function getMetadata(id, type) {
 function getStreams(id, type, season, episode, providerContext = null) {
   return __async(this, null, function* () {
     yield loadStreamingCommunityConfig();
+    yield ensureSession();
     const requestedType = String(type).toLowerCase();
     const normalizedType = requestedType === "series" ? "tv" : requestedType;
     const baseUrl = getStreamingCommunityBaseUrl();

@@ -72,6 +72,23 @@ try {
 
 const SC_DEFAULT_SITE = 'https://streamingunity.vip';
 
+// ===========================================================================
+// CREDENZIALI DEL PIANO PREMIUM
+//
+// Compila i due valori qui sotto con il tuo account StreamingCommunity.
+// Servono per lo streaming 1080p, che il sito riserva agli abbonati.
+//
+// ATTENZIONE: questo file e pubblico. Chiunque apra
+// raw.githubusercontent.com/brusus/Nuvio-tv-plugins/.../streamingcommunity.js
+// legge cio che scrivi qui. Usa una password che non usi da nessuna altra
+// parte, cosi un eventuale abuso resta confinato a questo account.
+//
+// Dopo averli compilati: node build.js, poi commit e push.
+// Lasciandoli vuoti il provider funziona come prima, in anonimo a 720p.
+// ===========================================================================
+const SC_ACCOUNT_EMAIL = 'rooting0001';
+const SC_ACCOUNT_PASSWORD = 'N.kwbU7KUHsLpg6';
+
 // Impostazioni fornite dall'app a runtime (globalThis.SCRAPER_SETTINGS) oppure,
 // quando il provider gira lato server, da variabile d'ambiente. Non esiste un
 // valore di riserva scritto nel codice: questo file e' pubblico su GitHub e
@@ -96,8 +113,94 @@ function getSiteBase() {
   return normalized || SC_DEFAULT_SITE;
 }
 
+// Sessione autenticata, risolta una volta sola per esecuzione.
+// Stringa vuota = nessun account configurato o login fallito.
+let scSessionCookie = null;
+let scSessionPromise = null;
+
+function readCookieValue(jar, name) {
+  const match = String(jar || "").match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+  if (!match) return "";
+  try { return decodeURIComponent(match[1]); } catch (_) { return match[1]; }
+}
+
+// I cookie piu recenti sostituiscono i precedenti con lo stesso nome.
+function mergeCookies(oldJar, newJar) {
+  const jar = new Map();
+  for (const part of [oldJar, newJar]) {
+    for (const piece of String(part || "").split("; ")) {
+      if (!piece) continue;
+      const eq = piece.indexOf("=");
+      if (eq > 0) jar.set(piece.slice(0, eq), piece.slice(eq + 1));
+    }
+  }
+  return Array.from(jar.entries()).map(([k, v]) => k + "=" + v).join("; ");
+}
+
+// Il sito e una applicazione Laravel con Sanctum: prima si raccolgono il
+// cookie di sessione e il token XSRF, poi si invia il form di accesso.
+async function ensureSession() {
+  if (scSessionCookie !== null) return scSessionCookie;
+  if (scSessionPromise) return await scSessionPromise;
+  if (!SC_ACCOUNT_EMAIL || !SC_ACCOUNT_PASSWORD) {
+    scSessionCookie = "";
+    return "";
+  }
+
+  scSessionPromise = (async () => {
+    const base = getSiteBase();
+    try {
+      const loginPage = await fetch(base + "/login", {
+        headers: { "User-Agent": USER_AGENT, "Accept-Language": "it-IT,it;q=0.9" }
+      });
+      let jar = getResponseCookies(loginPage);
+
+      const csrf = await fetch(base + "/sanctum/csrf-cookie", {
+        headers: {
+          "User-Agent": USER_AGENT,
+          "Referer": base + "/",
+          "Cookie": jar,
+          "X-Requested-With": "XMLHttpRequest"
+        }
+      });
+      jar = mergeCookies(jar, getResponseCookies(csrf));
+
+      const response = await fetch(base + "/login", {
+        method: "POST",
+        headers: {
+          "User-Agent": USER_AGENT,
+          "Cookie": jar,
+          "X-XSRF-TOKEN": readCookieValue(jar, "XSRF-TOKEN"),
+          "X-Requested-With": "XMLHttpRequest",
+          "Referer": base + "/login",
+          "Origin": base,
+          "Accept": "application/json, text/plain, */*",
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+        },
+        body: "email=" + encodeURIComponent(SC_ACCOUNT_EMAIL) +
+              "&password=" + encodeURIComponent(SC_ACCOUNT_PASSWORD)
+      });
+      jar = mergeCookies(jar, getResponseCookies(response));
+      // Si registra solo il codice HTTP: le credenziali non vanno nei log.
+      console.log("[StreamingCommunity] Login premium: HTTP " + response.status);
+      scSessionCookie = jar;
+      return jar;
+    } catch (error) {
+      console.warn("[StreamingCommunity] Login premium fallito, proseguo anonimo: " + error.message);
+      scSessionCookie = "";
+      return "";
+    } finally {
+      scSessionPromise = null;
+    }
+  })();
+
+  return await scSessionPromise;
+}
+
 function getSiteCookie() {
-  return getSetting('streamingcommunityCookie', 'STREAMINGCOMMUNITY_COOKIE');
+  const fromSettings = getSetting('streamingcommunityCookie', 'STREAMINGCOMMUNITY_COOKIE');
+  if (fromSettings) return fromSettings;
+  return scSessionCookie || "";
 }
 
 // Header per le richieste al sito, con il cookie di sessione se presente.
@@ -436,6 +539,7 @@ async function getMetadata(id, type) {
 
 async function getStreams(id, type, season, episode, providerContext = null) {
   await loadStreamingCommunityConfig();
+  await ensureSession();
   const requestedType = String(type).toLowerCase();
   const normalizedType = requestedType === "series" ? "tv" : requestedType;
   const baseUrl = getStreamingCommunityBaseUrl();
