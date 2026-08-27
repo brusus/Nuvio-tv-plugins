@@ -291,10 +291,19 @@ async function getStreams(id, type, season, episode, providerContext = null) {
   const queries = [info.title];
   if (info.originalTitle && info.originalTitle !== info.title) queries.push(info.originalTitle);
 
+  // Si interrogano tutte le query (titolo italiano e originale) accumulando i
+  // risultati: fermarsi alla prima query non vuota faceva perdere il titolo
+  // originale quando quello italiano restituiva schede non pertinenti, che poi
+  // il punteggio scartava lasciando zero candidati.
   let candidates = [];
+  const seenCandidateUrls = new Set();
   for (const q of queries) {
-    candidates = await searchCb01(q);
-    if (candidates.length) break;
+    const found = await searchCb01(q);
+    for (const c of found) {
+      if (seenCandidateUrls.has(c.url)) continue;
+      seenCandidateUrls.add(c.url);
+      candidates.push(c);
+    }
   }
   if (!candidates.length) return [];
 

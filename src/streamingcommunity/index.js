@@ -183,11 +183,22 @@ async function ensureSession() {
       jar = mergeCookies(jar, getResponseCookies(response));
       // Si registra solo il codice HTTP: le credenziali non vanno nei log.
       console.log("[StreamingCommunity] Login premium: HTTP " + response.status);
+
+      // Un login rifiutato (fetch non lancia sugli status di errore) non deve
+      // essere cachato come sessione valida. Su errore di autenticazione (4xx)
+      // si ripiega in anonimo senza reinsistere (""); su errore server (5xx) si
+      // lascia null cosi' che una chiamata successiva ritenti.
+      if (!response.ok) {
+        scSessionCookie = response.status >= 500 ? null : "";
+        return "";
+      }
       scSessionCookie = jar;
       return jar;
     } catch (error) {
       console.warn("[StreamingCommunity] Login premium fallito, proseguo anonimo: " + error.message);
-      scSessionCookie = "";
+      // Errore transitorio (rete/DNS): null lascia ritentare al prossimo
+      // getStreams invece di restare bloccati in anonimo per sempre.
+      scSessionCookie = null;
       return "";
     } finally {
       scSessionPromise = null;

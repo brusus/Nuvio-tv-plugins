@@ -70,7 +70,7 @@
     {
       "id": "easystreams-streamingcommunity",
       "name": "StreamingCommunity",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "description": "Movies and Series from StreamingCommunity",
       "resources": ["stream"],
       "contentLanguage": ["it"],
@@ -109,7 +109,7 @@
     {
       "id": "easystreams-cinejoy",
       "name": "Cinejoy",
-      "version": "1.0.3",
+      "version": "1.0.4",
       "description": "Movies and Series from Cinejoy (server resolver)",
       "resources": ["stream"],
       "contentLanguage": ["it"],
@@ -122,7 +122,7 @@
     {
       "id": "nuviotv-cb01",
       "name": "CB01",
-      "version": "1.0.3",
+      "version": "1.0.4",
       "description": "Film da CB01 (solo film: le serie passano da uprot, che richiede un captcha)",
       "resources": ["stream"],
       "contentLanguage": ["it"],

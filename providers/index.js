@@ -8400,11 +8400,15 @@ var require_streamingcommunity = __commonJS({
             });
             jar = mergeCookies(jar, getResponseCookies(response));
             console.log("[StreamingCommunity] Login premium: HTTP " + response.status);
+            if (!response.ok) {
+              scSessionCookie = response.status >= 500 ? null : "";
+              return "";
+            }
             scSessionCookie = jar;
             return jar;
           } catch (error) {
             console.warn("[StreamingCommunity] Login premium fallito, proseguo anonimo: " + error.message);
-            scSessionCookie = "";
+            scSessionCookie = null;
             return "";
           } finally {
             scSessionPromise = null;

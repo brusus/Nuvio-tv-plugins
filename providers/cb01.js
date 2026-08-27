@@ -539,9 +539,14 @@ function getStreams(id, type, season, episode, providerContext = null) {
     const queries = [info.title];
     if (info.originalTitle && info.originalTitle !== info.title) queries.push(info.originalTitle);
     let candidates = [];
+    const seenCandidateUrls = /* @__PURE__ */ new Set();
     for (const q of queries) {
-      candidates = yield searchCb01(q);
-      if (candidates.length) break;
+      const found = yield searchCb01(q);
+      for (const c of found) {
+        if (seenCandidateUrls.has(c.url)) continue;
+        seenCandidateUrls.add(c.url);
+        candidates.push(c);
+      }
     }
     if (!candidates.length) return [];
     const wantedTitle = normalizeTitle(info.title);
