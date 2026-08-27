@@ -70,7 +70,7 @@ try {
     ProxyAgent = null;
 }
 
-const SC_BASE = 'https://streamingcommunityz.review';
+const SC_BASE = 'https://streamingcommunityz.studio';
 let _sitemapCache = null;
 let _sitemapPromise = null;
 
