@@ -560,7 +560,7 @@ async function getStreams(id, type, season, episode, providerContext = null) {
       const targetProxySource = isStremioAddon ? cleanIframeUrl : cleanEmbedUrl;
 
       const result = {
-        name: `StreamingCommunity`,
+        name: isItalianAudio ? `StreamingCommunity` : `StreamingCommunity ENG`,
         title: finalDisplayName,
         url: streamUrl,
         easyProxySourceUrl: targetProxySource,
@@ -577,11 +577,31 @@ async function getStreams(id, type, season, episode, providerContext = null) {
       if (formatted) streams.push(formatted);
     }
 
+    // Il sito espone due varianti dello stesso titolo: quella scz, in italiano,
+    // e quella vixsrc con canPlayFHD, che spesso e' l'unica a salire di
+    // risoluzione. Prima ne veniva restituita una sola, la prima italiana,
+    // e la seconda andava persa anche quando offriva una qualita' migliore.
+    // Entrambe dichiarano una traccia audio ita, quindi il filtro per lingua
+    // non bastava a distinguerle: si restituiscono entrambe, italiane prima,
+    // deduplicando per URL.
     const itaStreams = streams.filter(s => Boolean(s.language) || s.title?.includes('🇮🇹'));
-    if (itaStreams.length > 0) {
-      return [itaStreams[0]];
+    const otherStreams = streams.filter(s => !itaStreams.includes(s));
+
+    const out = [];
+    const seenUrls = new Set();
+    const seenQualities = new Set();
+    for (const stream of [...itaStreams, ...otherStreams]) {
+      if (!stream || seenUrls.has(stream.url)) continue;
+      // Una seconda variante entra solo se offre una qualita' che manca:
+      // spesso le due sono identiche e aggiungerla sarebbe solo una voce
+      // doppia nella lista del player.
+      const tag = String(stream.qualityTag || stream.quality || '');
+      if (out.length > 0 && seenQualities.has(tag)) continue;
+      seenUrls.add(stream.url);
+      seenQualities.add(tag);
+      out.push(stream);
     }
-    return streams.length > 0 ? [streams[0]] : [];
+    return out;
   } catch (error) {
     console.error("[StreamingCommunity] Error:", error);
     return [];

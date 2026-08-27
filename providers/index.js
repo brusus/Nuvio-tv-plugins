@@ -8777,7 +8777,7 @@ var require_streamingcommunity = __commonJS({
             const isStremioAddon = Boolean(providerContext == null ? void 0 : providerContext.proxyUrl);
             const targetProxySource = isStremioAddon ? cleanIframeUrl : cleanEmbedUrl;
             const result = {
-              name: `StreamingCommunity`,
+              name: isItalianAudio ? `StreamingCommunity` : `StreamingCommunity ENG`,
               title: finalDisplayName,
               url: streamUrl,
               easyProxySourceUrl: targetProxySource,
@@ -8796,10 +8796,19 @@ var require_streamingcommunity = __commonJS({
             var _a;
             return Boolean(s.language) || ((_a = s.title) == null ? void 0 : _a.includes("\u{1F1EE}\u{1F1F9}"));
           });
-          if (itaStreams.length > 0) {
-            return [itaStreams[0]];
+          const otherStreams = streams.filter((s) => !itaStreams.includes(s));
+          const out = [];
+          const seenUrls = /* @__PURE__ */ new Set();
+          const seenQualities = /* @__PURE__ */ new Set();
+          for (const stream of [...itaStreams, ...otherStreams]) {
+            if (!stream || seenUrls.has(stream.url)) continue;
+            const tag = String(stream.qualityTag || stream.quality || "");
+            if (out.length > 0 && seenQualities.has(tag)) continue;
+            seenUrls.add(stream.url);
+            seenQualities.add(tag);
+            out.push(stream);
           }
-          return streams.length > 0 ? [streams[0]] : [];
+          return out;
         } catch (error) {
           console.error("[StreamingCommunity] Error:", error);
           return [];
