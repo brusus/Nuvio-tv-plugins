@@ -70,7 +70,47 @@ try {
     ProxyAgent = null;
 }
 
-const SC_BASE = 'https://streamingunity.vip';
+const SC_DEFAULT_SITE = 'https://streamingunity.vip';
+
+// Impostazioni fornite dall'app a runtime (globalThis.SCRAPER_SETTINGS) oppure,
+// quando il provider gira lato server, da variabile d'ambiente. Non esiste un
+// valore di riserva scritto nel codice: questo file e' pubblico su GitHub e
+// qualunque credenziale committata qui sarebbe leggibile da chiunque.
+function getSetting(settingName, envName) {
+  try {
+    const settings = (typeof globalThis !== 'undefined' && globalThis.SCRAPER_SETTINGS) || {};
+    const fromApp = settings[settingName];
+    const fromEnv = (typeof process !== 'undefined' && process.env && process.env[envName]) || '';
+    return String(fromApp || fromEnv || '').trim();
+  } catch (_) {
+    return '';
+  }
+}
+
+// Gli abbonati ricevono un "dominio premium privato": se configurato si usa
+// quello, perche' e' l'host su cui la sessione a pagamento e' valida.
+function getSiteBase() {
+  const custom = getSetting('streamingcommunitySiteUrl', 'STREAMINGCOMMUNITY_SITE_URL');
+  if (!custom) return SC_DEFAULT_SITE;
+  const normalized = normalizeStreamingCommunityBaseUrl(custom);
+  return normalized || SC_DEFAULT_SITE;
+}
+
+function getSiteCookie() {
+  return getSetting('streamingcommunityCookie', 'STREAMINGCOMMUNITY_COOKIE');
+}
+
+// Header per le richieste al sito, con il cookie di sessione se presente.
+function getSiteHeaders() {
+  const headers = {
+    'User-Agent': USER_AGENT,
+    'Referer': `${getSiteBase()}/`,
+    'Accept-Language': 'it-IT,it;q=0.9'
+  };
+  const cookie = getSiteCookie();
+  if (cookie) headers.Cookie = cookie;
+  return headers;
+}
 let _sitemapCache = null;
 let _sitemapPromise = null;
 
@@ -79,7 +119,7 @@ async function getSitemap() {
   if (_sitemapPromise) return await _sitemapPromise;
   _sitemapPromise = (async () => {
     try {
-      const r = await fetch(`${SC_BASE}/titles_it_sitemap.xml`);
+      const r = await fetch(`${getSiteBase()}/titles_it_sitemap.xml`, { headers: getSiteHeaders() });
       if (!r.ok) return [];
       const xml = await r.text();
       const entries = [];
@@ -115,9 +155,9 @@ function findInSitemap(entries, name) {
 async function scrapeTitle(id, slug, season = null) {
   try {
     const baseSlug = slug ? String(slug).replace(/\/season-\d+.*$/i, '') : '';
-    let url = `${SC_BASE}/it/titles/${id}${baseSlug ? '-' + baseSlug : ''}`;
+    let url = `${getSiteBase()}/it/titles/${id}${baseSlug ? '-' + baseSlug : ''}`;
     if (season) url += `/season-${season}`;
-    const r = await fetch(url);
+    const r = await fetch(url, { headers: getSiteHeaders() });
     if (!r.ok) return null;
     const html = await r.text();
     const m = html.match(/data-page="({.+?})"/);
@@ -138,9 +178,9 @@ async function scrapeTitle(id, slug, season = null) {
 
 async function getCamEmbed(titleId, episodeId) {
   try {
-    let url = `${SC_BASE}/it/iframe/${titleId}`;
+    let url = `${getSiteBase()}/it/iframe/${titleId}`;
     if (episodeId) url += `?episode_id=${episodeId}`;
-    const r = await fetch(url);
+    const r = await fetch(url, { headers: getSiteHeaders() });
     if (!r.ok) return null;
     const m = (await r.text()).match(/src="(https:\/\/vixcloud\.co\/embed\/[^"]+)"/);
     return m ? m[1].replace(/&amp;/g, '&') : null;
@@ -167,7 +207,7 @@ async function resolveSczEmbed(metadata, normalizedType, season, episode, rawId)
     if (!candidateMatches.length) {
       for (const t of titlesToTry) {
         try {
-          const r = await fetch(`${SC_BASE}/it/search?q=${encodeURIComponent(t)}`);
+          const r = await fetch(`${getSiteBase()}/it/search?q=${encodeURIComponent(t)}`, { headers: getSiteHeaders() });
           if (!r.ok) continue;
           const html = await r.text();
           const m = html.match(/data-page="({.+?})"/);
@@ -208,7 +248,7 @@ async function resolveSczEmbed(metadata, normalizedType, season, episode, rawId)
       episodeId = epObj.id;
     }
 
-    const iframeUrl = `${SC_BASE}/it/iframe/${foundTitle.id}${episodeId ? '?episode_id=' + episodeId : ''}`;
+    const iframeUrl = `${getSiteBase()}/it/iframe/${foundTitle.id}${episodeId ? '?episode_id=' + episodeId : ''}`;
     const embedUrl = await getCamEmbed(foundTitle.id, episodeId);
     if (!embedUrl) return null;
 
@@ -237,7 +277,9 @@ function getCommonHeaders() {
 }
 
 function getEmbedHeaders(embedUrl) {
+  const cookie = getSiteCookie();
   return {
+    ...(cookie ? { Cookie: cookie } : {}),
     "User-Agent": USER_AGENT,
     "Referer": `${getStreamingCommunityBaseUrl()}/`,
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",

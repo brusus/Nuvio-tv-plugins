@@ -8319,7 +8319,36 @@ var require_streamingcommunity = __commonJS({
     } catch (_) {
       ProxyAgent = null;
     }
-    var SC_BASE = "https://streamingunity.vip";
+    var SC_DEFAULT_SITE = "https://streamingunity.vip";
+    function getSetting(settingName, envName) {
+      try {
+        const settings = typeof globalThis !== "undefined" && globalThis.SCRAPER_SETTINGS || {};
+        const fromApp = settings[settingName];
+        const fromEnv = typeof process !== "undefined" && process.env && process.env[envName] || "";
+        return String(fromApp || fromEnv || "").trim();
+      } catch (_) {
+        return "";
+      }
+    }
+    function getSiteBase() {
+      const custom = getSetting("streamingcommunitySiteUrl", "STREAMINGCOMMUNITY_SITE_URL");
+      if (!custom) return SC_DEFAULT_SITE;
+      const normalized = normalizeStreamingCommunityBaseUrl(custom);
+      return normalized || SC_DEFAULT_SITE;
+    }
+    function getSiteCookie() {
+      return getSetting("streamingcommunityCookie", "STREAMINGCOMMUNITY_COOKIE");
+    }
+    function getSiteHeaders() {
+      const headers = {
+        "User-Agent": USER_AGENT,
+        "Referer": `${getSiteBase()}/`,
+        "Accept-Language": "it-IT,it;q=0.9"
+      };
+      const cookie = getSiteCookie();
+      if (cookie) headers.Cookie = cookie;
+      return headers;
+    }
     var _sitemapCache = null;
     var _sitemapPromise = null;
     function getSitemap() {
@@ -8328,7 +8357,7 @@ var require_streamingcommunity = __commonJS({
         if (_sitemapPromise) return yield _sitemapPromise;
         _sitemapPromise = (() => __async(null, null, function* () {
           try {
-            const r = yield fetch(`${SC_BASE}/titles_it_sitemap.xml`);
+            const r = yield fetch(`${getSiteBase()}/titles_it_sitemap.xml`, { headers: getSiteHeaders() });
             if (!r.ok) return [];
             const xml = yield r.text();
             const entries = [];
@@ -8365,9 +8394,9 @@ var require_streamingcommunity = __commonJS({
         var _a, _b;
         try {
           const baseSlug = slug ? String(slug).replace(/\/season-\d+.*$/i, "") : "";
-          let url = `${SC_BASE}/it/titles/${id}${baseSlug ? "-" + baseSlug : ""}`;
+          let url = `${getSiteBase()}/it/titles/${id}${baseSlug ? "-" + baseSlug : ""}`;
           if (season) url += `/season-${season}`;
-          const r = yield fetch(url);
+          const r = yield fetch(url, { headers: getSiteHeaders() });
           if (!r.ok) return null;
           const html = yield r.text();
           const m = html.match(/data-page="({.+?})"/);
@@ -8396,9 +8425,9 @@ var require_streamingcommunity = __commonJS({
     function getCamEmbed(titleId, episodeId) {
       return __async(this, null, function* () {
         try {
-          let url = `${SC_BASE}/it/iframe/${titleId}`;
+          let url = `${getSiteBase()}/it/iframe/${titleId}`;
           if (episodeId) url += `?episode_id=${episodeId}`;
-          const r = yield fetch(url);
+          const r = yield fetch(url, { headers: getSiteHeaders() });
           if (!r.ok) return null;
           const m = (yield r.text()).match(/src="(https:\/\/vixcloud\.co\/embed\/[^"]+)"/);
           return m ? m[1].replace(/&amp;/g, "&") : null;
@@ -8426,7 +8455,7 @@ var require_streamingcommunity = __commonJS({
           if (!candidateMatches.length) {
             for (const t of titlesToTry) {
               try {
-                const r = yield fetch(`${SC_BASE}/it/search?q=${encodeURIComponent(t)}`);
+                const r = yield fetch(`${getSiteBase()}/it/search?q=${encodeURIComponent(t)}`, { headers: getSiteHeaders() });
                 if (!r.ok) continue;
                 const html = yield r.text();
                 const m = html.match(/data-page="({.+?})"/);
@@ -8464,7 +8493,7 @@ var require_streamingcommunity = __commonJS({
             if (!epObj) return null;
             episodeId = epObj.id;
           }
-          const iframeUrl = `${SC_BASE}/it/iframe/${foundTitle.id}${episodeId ? "?episode_id=" + episodeId : ""}`;
+          const iframeUrl = `${getSiteBase()}/it/iframe/${foundTitle.id}${episodeId ? "?episode_id=" + episodeId : ""}`;
           const embedUrl = yield getCamEmbed(foundTitle.id, episodeId);
           if (!embedUrl) return null;
           return { embedUrl, iframeUrl };
@@ -8490,12 +8519,13 @@ var require_streamingcommunity = __commonJS({
       };
     }
     function getEmbedHeaders(embedUrl) {
-      return {
+      const cookie = getSiteCookie();
+      return __spreadProps(__spreadValues({}, cookie ? { Cookie: cookie } : {}), {
         "User-Agent": USER_AGENT,
         "Referer": `${getStreamingCommunityBaseUrl()}/`,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
         "Accept-Language": "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7"
-      };
+      });
     }
     function getPlaylistHeaders(embedUrl) {
       let origin = getStreamingCommunityBaseUrl();
