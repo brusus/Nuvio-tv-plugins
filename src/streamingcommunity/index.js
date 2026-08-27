@@ -70,7 +70,7 @@ try {
     ProxyAgent = null;
 }
 
-const SC_BASE = 'https://streamingcommunityz.studio';
+const SC_BASE = 'https://streamingunity.vip';
 let _sitemapCache = null;
 let _sitemapPromise = null;
 

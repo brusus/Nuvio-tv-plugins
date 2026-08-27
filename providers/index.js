@@ -8319,7 +8319,7 @@ var require_streamingcommunity = __commonJS({
     } catch (_) {
       ProxyAgent = null;
     }
-    var SC_BASE = "https://streamingcommunityz.studio";
+    var SC_BASE = "https://streamingunity.vip";
     var _sitemapCache = null;
     var _sitemapPromise = null;
     function getSitemap() {
