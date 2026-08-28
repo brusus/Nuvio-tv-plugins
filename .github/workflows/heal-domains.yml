@@ -1,0 +1,51 @@
+name: Heal Domains
+
+# Controlla se i siti dei provider hanno cambiato dominio (redirect) e, in caso,
+# aggiorna il sorgente, ricompila i bundle e committa. Gira ogni ora e a mano.
+
+on:
+  schedule:
+    - cron: "17 * * * *"   # ogni ora, al minuto 17
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: heal-domains
+  cancel-in-progress: false
+
+jobs:
+  heal:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        run: npm install --no-audit --no-fund
+
+      - name: Rileva e applica i domini spostati
+        run: node scripts/heal-domains.js
+
+      - name: Ricompila e committa se qualcosa e' cambiato
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "Nessuna modifica: niente da fare."
+            exit 0
+          fi
+          echo "Modifiche rilevate, ricompilo i bundle..."
+          node build.js
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          SUMMARY=$(cat .heal-summary.txt 2>/dev/null || echo "domini aggiornati")
+          rm -f .heal-summary.txt
+          git add -A
+          git commit -m "Heal domains: aggiorna i domini spostati" -m "$SUMMARY"
+          git push

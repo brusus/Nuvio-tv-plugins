@@ -16,3 +16,4 @@ cf-session-maxstream.json
 *.log
 /downloaded_files
 cinemacity-sitemap.json
+.heal-summary.txt

@@ -3,7 +3,7 @@ const { resolveLiveDomain } = require('../domain_helper.js');
 const { getQualityFromUrl } = require('../quality_helper.js');
 
 const TMDB_API_KEY = '68e094699525b18a70bab2f86b1fa706';
-let BASE_URL = 'https://cb01uno.monster';
+let BASE_URL = 'https://cb01uno.blog';
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
 const REQUEST_TIMEOUT_MS = 15000;
@@ -278,7 +278,7 @@ function toMixDropEmbed(rawUrl) {
 // --- entry point ---------------------------------------------------------
 
 async function getStreams(id, type, season, episode, providerContext = null) {
-  BASE_URL = await resolveLiveDomain("https://cb01uno.monster");
+  BASE_URL = await resolveLiveDomain("https://cb01uno.blog");
   const normalizedType = String(type || '').toLowerCase();
   // CB01 series pages route through uprot, which is captcha-gated, so only
   // movies can be served reliably from a plugin.
