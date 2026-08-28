@@ -86,7 +86,7 @@ const SC_DEFAULT_SITE = 'https://streamingunity.vip';
 // Dopo averli compilati: node build.js, poi commit e push.
 // Lasciandoli vuoti il provider funziona come prima, in anonimo a 720p.
 // ===========================================================================
-const SC_ACCOUNT_EMAIL = 'rooting0001';
+const SC_ACCOUNT_EMAIL = 'rooting00@pm.me';
 const SC_ACCOUNT_PASSWORD = 'N.kwbU7KUHsLpg6';
 
 // Impostazioni fornite dall'app a runtime (globalThis.SCRAPER_SETTINGS) oppure,
@@ -220,7 +220,10 @@ async function ensureSession() {
           "Accept": "application/json, text/plain, */*",
           "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
         },
-        body: "email=" + encodeURIComponent(SC_ACCOUNT_EMAIL) +
+        // Il form di login del sito usa il campo "username" (che accetta
+        // l'indirizzo email come valore), non "email": mandare "email" fa
+        // rispondere 422 "The username field is required".
+        body: "username=" + encodeURIComponent(SC_ACCOUNT_EMAIL) +
               "&password=" + encodeURIComponent(SC_ACCOUNT_PASSWORD)
       });
       jar = mergeCookies(jar, getResponseCookies(response));

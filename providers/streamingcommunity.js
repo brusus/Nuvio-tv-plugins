@@ -371,7 +371,7 @@ try {
   ProxyAgent = null;
 }
 var SC_DEFAULT_SITE = "https://streamingunity.vip";
-var SC_ACCOUNT_EMAIL = "rooting0001";
+var SC_ACCOUNT_EMAIL = "rooting00@pm.me";
 var SC_ACCOUNT_PASSWORD = "N.kwbU7KUHsLpg6";
 function getSetting(settingName, envName) {
   try {
@@ -478,7 +478,10 @@ function ensureSession() {
             "Accept": "application/json, text/plain, */*",
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
           },
-          body: "email=" + encodeURIComponent(SC_ACCOUNT_EMAIL) + "&password=" + encodeURIComponent(SC_ACCOUNT_PASSWORD)
+          // Il form di login del sito usa il campo "username" (che accetta
+          // l'indirizzo email come valore), non "email": mandare "email" fa
+          // rispondere 422 "The username field is required".
+          body: "username=" + encodeURIComponent(SC_ACCOUNT_EMAIL) + "&password=" + encodeURIComponent(SC_ACCOUNT_PASSWORD)
         });
         jar = mergeCookies(jar, getResponseCookies(response));
         console.log("[StreamingCommunity] Login premium: HTTP " + response.status);
