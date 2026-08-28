@@ -3,11 +3,13 @@
 const { extractVixCloud, rewriteVixsrcHost } = require("../extractors");
 const { getProxiedUrl } = require("../extractors/common.js");
 const { formatStream } = require("../formatter.js");
+const { resolveLiveDomain } = require("../domain_helper.js");
 const { checkQualityFromPlaylist } = require("../quality_helper.js");
 const { createTimeoutSignal } = require("../fetch_helper.js");
 
+let unityBaseUrl = "https://www.animeunity.so";
 function getUnityBaseUrl() {
-  return "https://www.animeunity.so";
+  return unityBaseUrl;
 }
 
 function getMappingApiBase() {
@@ -1342,6 +1344,7 @@ async function extractStreamsFromAnimePath(animePath, requestedEpisode) {
 }
 
 async function getStreams(id, type, season, episode, providerContext = null) {
+  unityBaseUrl = await resolveLiveDomain("https://www.animeunity.so");
   try {
     const lookup = resolveLookupRequest(id, season, episode, providerContext);
     if (!lookup) return [];

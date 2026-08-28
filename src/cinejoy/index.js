@@ -1,4 +1,5 @@
 const { formatStream } = require('../formatter.js');
+const { resolveLiveDomain } = require('../domain_helper.js');
 const { checkQualityFromText } = require('../quality_helper.js');
 
 const IS_SERVER = typeof process !== 'undefined' && process.versions && process.versions.node;
@@ -26,7 +27,7 @@ if (!IS_SERVER) {
 } else {
 const { webcrypto, createHash } = require('crypto');
 
-const BASE_URL = 'https://cinejoy.to';
+let BASE_URL = 'https://cinejoy.to';
 const API_URL = 'https://api.shegu.st';
 const WASM_URL = `${API_URL}/crush.wasm`;
 const TMDB_API_KEY = '68e094699525b18a70bab2f86b1fa706';
@@ -560,6 +561,7 @@ async function getServerStreams(
 }
 
 async function getStreams(id, type, season, episode, providerContext = null) {
+  BASE_URL = await resolveLiveDomain("https://cinejoy.to");
   setDiagnostics('start', { id: String(id || ''), type: String(type || '') });
   const normalizedType = String(type || '').toLowerCase();
   if (!['movie', 'tv', 'series'].includes(normalizedType)) return [];

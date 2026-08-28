@@ -9679,6 +9679,48 @@ var require_extractors = __commonJS({
   }
 });
 
+// src/domain_helper.js
+var require_domain_helper = __commonJS({
+  "src/domain_helper.js"(exports2, module2) {
+    var DEFAULT_UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
+    var _cache = /* @__PURE__ */ new Map();
+    function resolveLiveDomain(startUrl, userAgent) {
+      return __async(this, null, function* () {
+        const start = String(startUrl || "").replace(/\/+$/, "");
+        if (!start) return start;
+        if (_cache.has(start)) return yield _cache.get(start);
+        const p = (() => __async(null, null, function* () {
+          try {
+            const res = yield fetch(start + "/", {
+              headers: {
+                "User-Agent": userAgent || DEFAULT_UA,
+                "Accept-Language": "it-IT,it;q=0.9"
+              }
+            });
+            if (res && res.body && typeof res.body.cancel === "function") {
+              res.body.cancel().catch(() => {
+              });
+            }
+            if (res && res.ok && res.url) {
+              const origin = new URL(res.url).origin;
+              if (origin && origin !== start) {
+                console.log("[domain] spostato: " + start + " -> " + origin);
+              }
+              return origin || start;
+            }
+            return start;
+          } catch (_) {
+            return start;
+          }
+        }))();
+        _cache.set(start, p);
+        return yield p;
+      });
+    }
+    module2.exports = { resolveLiveDomain };
+  }
+});
+
 // src/animeunity/index.js
 var require_animeunity = __commonJS({
   "src/animeunity/index.js"(exports2, module2) {
@@ -9686,10 +9728,12 @@ var require_animeunity = __commonJS({
     var { extractVixCloud, rewriteVixsrcHost } = require_extractors();
     var { getProxiedUrl } = require_common();
     var { formatStream } = require_formatter();
+    var { resolveLiveDomain } = require_domain_helper();
     var { checkQualityFromPlaylist } = require_quality_helper();
     var { createTimeoutSignal: createTimeoutSignal2 } = require_fetch_helper();
+    var unityBaseUrl = "https://www.animeunity.so";
     function getUnityBaseUrl() {
-      return "https://www.animeunity.so";
+      return unityBaseUrl;
     }
     function getMappingApiBase() {
       return "https://animemapping.realbestia.com";
@@ -10775,6 +10819,7 @@ var require_animeunity = __commonJS({
     }
     function getStreams2(id, type, season, episode, providerContext = null) {
       return __async(this, null, function* () {
+        unityBaseUrl = yield resolveLiveDomain("https://www.animeunity.so");
         try {
           const lookup = resolveLookupRequest(id, season, episode, providerContext);
           if (!lookup) return [];
@@ -10832,10 +10877,12 @@ var require_animeworld = __commonJS({
   "src/animeworld/index.js"(exports2, module2) {
     "use strict";
     var { formatStream } = require_formatter();
+    var { resolveLiveDomain } = require_domain_helper();
     var { checkQualityFromPlaylist } = require_quality_helper();
     var { createTimeoutSignal: createTimeoutSignal2 } = require_fetch_helper();
+    var worldBaseUrl = "https://www.animeworld.ac";
     function getWorldBaseUrl() {
-      return "https://www.animeworld.ac";
+      return worldBaseUrl;
     }
     function getMappingApiBase() {
       return "https://animemapping.realbestia.com";
@@ -11686,6 +11733,7 @@ var require_animeworld = __commonJS({
     }
     function getStreams2(id, type, season, episode, providerContext = null) {
       return __async(this, null, function* () {
+        worldBaseUrl = yield resolveLiveDomain("https://www.animeworld.ac");
         try {
           const lookup = resolveLookupRequest(id, season, episode, providerContext);
           if (!lookup) return [];
@@ -11744,11 +11792,13 @@ var require_animesaturn = __commonJS({
   "src/animesaturn/index.js"(exports2, module2) {
     "use strict";
     var { formatStream } = require_formatter();
+    var { resolveLiveDomain } = require_domain_helper();
     var { checkQualityFromPlaylist } = require_quality_helper();
     var { createTimeoutSignal: createTimeoutSignal2 } = require_fetch_helper();
     var { getProxiedUrl } = require_common();
+    var saturnBaseUrl = "https://www.animesaturn.net";
     function getSaturnBaseUrl() {
-      return "https://www.animesaturn.net";
+      return saturnBaseUrl;
     }
     function getMappingApiBase() {
       return "https://animemapping.realbestia.com";
@@ -12740,6 +12790,7 @@ var require_animesaturn = __commonJS({
     function getStreams2(id, type, season, episode, providerContext = null) {
       return __async(this, null, function* () {
         var _a;
+        saturnBaseUrl = yield resolveLiveDomain("https://www.animesaturn.net");
         try {
           const lookup = resolveLookupRequest(id, season, episode, providerContext);
           if (!lookup) return [];
@@ -13159,6 +13210,7 @@ var require_altadefinizionestreaming = __commonJS({
     var CDN_PROBE_TIMEOUT_MS = 500;
     var SESSION_COOKIE = "sid=32234dfabd14e587764e84405e75e99856c6bef31c6b1752e19897b8ae3d4a21";
     var { formatStream } = require_formatter();
+    var { resolveLiveDomain } = require_domain_helper();
     function getCookie() {
       var _a, _b;
       try {
@@ -13261,6 +13313,7 @@ var require_altadefinizionestreaming = __commonJS({
     }
     function getStreams2(id, type, season, episode, providerContext = null) {
       return __async(this, null, function* () {
+        BASE_URL = yield resolveLiveDomain("https://altadefinizionestreaming.tv");
         const normalizedType = String(type || "").toLowerCase();
         if (normalizedType !== "movie" && normalizedType !== "tv" && normalizedType !== "series") return [];
         const cookie = getCookie();
@@ -13456,6 +13509,7 @@ var require_cc = __commonJS({
     "use strict";
     var { formatStream } = require_formatter();
     var { fetchWithTimeout } = require_fetch_helper();
+    var { resolveLiveDomain } = require_domain_helper();
     var BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
     function base64Decode(str) {
       try {
@@ -13491,7 +13545,8 @@ var require_cc = __commonJS({
         return "";
       }
     }
-    var BASE_URL = base64Decode("aHR0cHM6Ly9jaW5lbWFjaXR5LmNj");
+    var CC_DEFAULT = base64Decode("aHR0cHM6Ly9jaW5lbWFjaXR5LmNj");
+    var BASE_URL = CC_DEFAULT;
     var USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
     var FETCH_TIMEOUT = 1e4;
     var STREAM_CHECK_TIMEOUT = 1e3;
@@ -14025,6 +14080,8 @@ var require_cc = __commonJS({
     }
     function getStreams2(id, type, season, episode, providerContext = null) {
       return __async(this, null, function* () {
+        BASE_URL = yield resolveLiveDomain(CC_DEFAULT);
+        SITEMAP_URL = `${BASE_URL}/news_pages.xml`;
         const parsedRequest = parseCompositeSeriesId2(id, season, episode);
         id = parsedRequest.normalizedId;
         season = parsedRequest.season;
@@ -14181,6 +14238,7 @@ var require_cc = __commonJS({
 var require_cinejoy = __commonJS({
   "src/cinejoy/index.js"(exports2, module2) {
     var { formatStream } = require_formatter();
+    var { resolveLiveDomain } = require_domain_helper();
     var { checkQualityFromText } = require_quality_helper();
     var IS_SERVER = typeof process !== "undefined" && process.versions && process.versions.node;
     if (!IS_SERVER) {
@@ -14360,7 +14418,7 @@ var require_cinejoy = __commonJS({
       };
       setDiagnostics = setDiagnostics2, getDiagnostics = getDiagnostics2, fetchWithTimeout = fetchWithTimeout2, resolveTmdbId = resolveTmdbId2, getTitleHint = getTitleHint2, parseHlsAttributes = parseHlsAttributes2, normalizeQuality = normalizeQuality2, resolvePlaylistUrl = resolvePlaylistUrl2, inspectHlsMaster = inspectHlsMaster2, encodeBase64Url = encodeBase64Url2, buildVixsrcAudioUrl = buildVixsrcAudioUrl2, buildDualFallbackUrl = buildDualFallbackUrl2, getMediaRequest = getMediaRequest2, buildDualMediaKey = buildDualMediaKey2, buildDualVideoFingerprint = buildDualVideoFingerprint2;
       const { webcrypto, createHash } = require("crypto");
-      const BASE_URL = "https://cinejoy.to";
+      let BASE_URL = "https://cinejoy.to";
       const API_URL = "https://api.shegu.st";
       const WASM_URL = `${API_URL}/crush.wasm`;
       const TMDB_API_KEY2 = "68e094699525b18a70bab2f86b1fa706";
@@ -14656,6 +14714,7 @@ var require_cinejoy = __commonJS({
       }
       function getStreams2(id, type, season, episode, providerContext = null) {
         return __async(this, null, function* () {
+          BASE_URL = yield resolveLiveDomain("https://cinejoy.to");
           setDiagnostics2("start", { id: String(id || ""), type: String(type || "") });
           const normalizedType = String(type || "").toLowerCase();
           if (!["movie", "tv", "series"].includes(normalizedType)) return [];

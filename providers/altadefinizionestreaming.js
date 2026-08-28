@@ -176,6 +176,48 @@ var require_formatter = __commonJS({
   }
 });
 
+// src/domain_helper.js
+var require_domain_helper = __commonJS({
+  "src/domain_helper.js"(exports2, module2) {
+    var DEFAULT_UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
+    var _cache = /* @__PURE__ */ new Map();
+    function resolveLiveDomain2(startUrl, userAgent) {
+      return __async(this, null, function* () {
+        const start = String(startUrl || "").replace(/\/+$/, "");
+        if (!start) return start;
+        if (_cache.has(start)) return yield _cache.get(start);
+        const p = (() => __async(null, null, function* () {
+          try {
+            const res = yield fetch(start + "/", {
+              headers: {
+                "User-Agent": userAgent || DEFAULT_UA,
+                "Accept-Language": "it-IT,it;q=0.9"
+              }
+            });
+            if (res && res.body && typeof res.body.cancel === "function") {
+              res.body.cancel().catch(() => {
+              });
+            }
+            if (res && res.ok && res.url) {
+              const origin = new URL(res.url).origin;
+              if (origin && origin !== start) {
+                console.log("[domain] spostato: " + start + " -> " + origin);
+              }
+              return origin || start;
+            }
+            return start;
+          } catch (_) {
+            return start;
+          }
+        }))();
+        _cache.set(start, p);
+        return yield p;
+      });
+    }
+    module2.exports = { resolveLiveDomain: resolveLiveDomain2 };
+  }
+});
+
 // src/altadefinizionestreaming/index.js
 var TMDB_API_KEY = "68e094699525b18a70bab2f86b1fa706";
 var BASE_URL = "https://altadefinizionestreaming.tv";
@@ -183,6 +225,7 @@ var USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, lik
 var CDN_PROBE_TIMEOUT_MS = 500;
 var SESSION_COOKIE = "sid=32234dfabd14e587764e84405e75e99856c6bef31c6b1752e19897b8ae3d4a21";
 var { formatStream } = require_formatter();
+var { resolveLiveDomain } = require_domain_helper();
 function getCookie() {
   var _a, _b;
   try {
@@ -285,6 +328,7 @@ function addCdnStream(streams, tmdbId, type, season, episode, displayName, cooki
 }
 function getStreams(id, type, season, episode, providerContext = null) {
   return __async(this, null, function* () {
+    BASE_URL = yield resolveLiveDomain("https://altadefinizionestreaming.tv");
     const normalizedType = String(type || "").toLowerCase();
     if (normalizedType !== "movie" && normalizedType !== "tv" && normalizedType !== "series") return [];
     const cookie = getCookie();

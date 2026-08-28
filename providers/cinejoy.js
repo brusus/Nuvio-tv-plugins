@@ -188,6 +188,48 @@ var require_formatter = __commonJS({
   }
 });
 
+// src/domain_helper.js
+var require_domain_helper = __commonJS({
+  "src/domain_helper.js"(exports2, module2) {
+    var DEFAULT_UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
+    var _cache = /* @__PURE__ */ new Map();
+    function resolveLiveDomain2(startUrl, userAgent) {
+      return __async(this, null, function* () {
+        const start = String(startUrl || "").replace(/\/+$/, "");
+        if (!start) return start;
+        if (_cache.has(start)) return yield _cache.get(start);
+        const p = (() => __async(null, null, function* () {
+          try {
+            const res = yield fetch(start + "/", {
+              headers: {
+                "User-Agent": userAgent || DEFAULT_UA,
+                "Accept-Language": "it-IT,it;q=0.9"
+              }
+            });
+            if (res && res.body && typeof res.body.cancel === "function") {
+              res.body.cancel().catch(() => {
+              });
+            }
+            if (res && res.ok && res.url) {
+              const origin = new URL(res.url).origin;
+              if (origin && origin !== start) {
+                console.log("[domain] spostato: " + start + " -> " + origin);
+              }
+              return origin || start;
+            }
+            return start;
+          } catch (_) {
+            return start;
+          }
+        }))();
+        _cache.set(start, p);
+        return yield p;
+      });
+    }
+    module2.exports = { resolveLiveDomain: resolveLiveDomain2 };
+  }
+});
+
 // src/fetch_helper.js
 var require_fetch_helper = __commonJS({
   "src/fetch_helper.js"(exports2, module2) {
@@ -308,6 +350,7 @@ var require_quality_helper = __commonJS({
 
 // src/cinejoy/index.js
 var { formatStream } = require_formatter();
+var { resolveLiveDomain } = require_domain_helper();
 var { checkQualityFromText } = require_quality_helper();
 var IS_SERVER = typeof process !== "undefined" && process.versions && process.versions.node;
 if (!IS_SERVER) {
@@ -487,7 +530,7 @@ if (!IS_SERVER) {
   };
   setDiagnostics2 = setDiagnostics, getDiagnostics2 = getDiagnostics, fetchWithTimeout2 = fetchWithTimeout, resolveTmdbId2 = resolveTmdbId, getTitleHint2 = getTitleHint, parseHlsAttributes2 = parseHlsAttributes, normalizeQuality2 = normalizeQuality, resolvePlaylistUrl2 = resolvePlaylistUrl, inspectHlsMaster2 = inspectHlsMaster, encodeBase64Url2 = encodeBase64Url, buildVixsrcAudioUrl2 = buildVixsrcAudioUrl, buildDualFallbackUrl2 = buildDualFallbackUrl, getMediaRequest2 = getMediaRequest, buildDualMediaKey2 = buildDualMediaKey, buildDualVideoFingerprint2 = buildDualVideoFingerprint;
   const { webcrypto, createHash } = require("crypto");
-  const BASE_URL = "https://cinejoy.to";
+  let BASE_URL = "https://cinejoy.to";
   const API_URL = "https://api.shegu.st";
   const WASM_URL = `${API_URL}/crush.wasm`;
   const TMDB_API_KEY = "68e094699525b18a70bab2f86b1fa706";
@@ -783,6 +826,7 @@ if (!IS_SERVER) {
   }
   function getStreams(id, type, season, episode, providerContext = null) {
     return __async(this, null, function* () {
+      BASE_URL = yield resolveLiveDomain("https://cinejoy.to");
       setDiagnostics("start", { id: String(id || ""), type: String(type || "") });
       const normalizedType = String(type || "").toLowerCase();
       if (!["movie", "tv", "series"].includes(normalizedType)) return [];

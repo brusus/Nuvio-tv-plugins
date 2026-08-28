@@ -1,12 +1,14 @@
 "use strict";
 
 const { formatStream } = require("../formatter.js");
+const { resolveLiveDomain } = require("../domain_helper.js");
 const { checkQualityFromPlaylist } = require("../quality_helper.js");
 const { createTimeoutSignal } = require("../fetch_helper.js");
 const { getProxiedUrl } = require("../extractors/common.js");
 
+let saturnBaseUrl = "https://www.animesaturn.net";
 function getSaturnBaseUrl() {
-  return "https://www.animesaturn.net";
+  return saturnBaseUrl;
 }
 
 function getMappingApiBase() {
@@ -1237,6 +1239,7 @@ function resolveEpisodeFromMappingPayload(mappingPayload, fallbackEpisode) {
 }
 
 async function getStreams(id, type, season, episode, providerContext = null) {
+  saturnBaseUrl = await resolveLiveDomain("https://www.animesaturn.net");
   try {
     const lookup = resolveLookupRequest(id, season, episode, providerContext);
     if (!lookup) return [];

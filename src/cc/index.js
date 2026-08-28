@@ -2,6 +2,7 @@
 
 const { formatStream } = require('../formatter.js');
 const { fetchWithTimeout } = require('../fetch_helper.js');
+const { resolveLiveDomain } = require('../domain_helper.js');
 
 const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 
@@ -36,12 +37,13 @@ function base64Decode(str) {
     }
 }
 
-const BASE_URL = base64Decode("aHR0cHM6Ly9jaW5lbWFjaXR5LmNj");
+const CC_DEFAULT = base64Decode("aHR0cHM6Ly9jaW5lbWFjaXR5LmNj");
+let BASE_URL = CC_DEFAULT;
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
 const FETCH_TIMEOUT = 10000;
 const STREAM_CHECK_TIMEOUT = 1000;
 const TMDB_API_KEY = "68e094699525b18a70bab2f86b1fa706";
-const SITEMAP_URL = `${BASE_URL}/news_pages.xml`;
+let SITEMAP_URL = `${BASE_URL}/news_pages.xml`;
 const SITEMAP_CACHE_MS = 60 * 60 * 1000;
 let sitemapCache = null;
 
@@ -610,6 +612,8 @@ async function checkItalianAudioInPlaylist(url) {
 }
 
 async function getStreams(id, type, season, episode, providerContext = null) {
+    BASE_URL = await resolveLiveDomain(CC_DEFAULT);
+    SITEMAP_URL = `${BASE_URL}/news_pages.xml`;
     const parsedRequest = parseCompositeSeriesId(id, season, episode);
     id = parsedRequest.normalizedId;
     season = parsedRequest.season;

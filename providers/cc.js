@@ -249,9 +249,52 @@ var require_fetch_helper = __commonJS({
   }
 });
 
+// src/domain_helper.js
+var require_domain_helper = __commonJS({
+  "src/domain_helper.js"(exports2, module2) {
+    var DEFAULT_UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
+    var _cache = /* @__PURE__ */ new Map();
+    function resolveLiveDomain2(startUrl, userAgent) {
+      return __async(this, null, function* () {
+        const start = String(startUrl || "").replace(/\/+$/, "");
+        if (!start) return start;
+        if (_cache.has(start)) return yield _cache.get(start);
+        const p = (() => __async(null, null, function* () {
+          try {
+            const res = yield fetch(start + "/", {
+              headers: {
+                "User-Agent": userAgent || DEFAULT_UA,
+                "Accept-Language": "it-IT,it;q=0.9"
+              }
+            });
+            if (res && res.body && typeof res.body.cancel === "function") {
+              res.body.cancel().catch(() => {
+              });
+            }
+            if (res && res.ok && res.url) {
+              const origin = new URL(res.url).origin;
+              if (origin && origin !== start) {
+                console.log("[domain] spostato: " + start + " -> " + origin);
+              }
+              return origin || start;
+            }
+            return start;
+          } catch (_) {
+            return start;
+          }
+        }))();
+        _cache.set(start, p);
+        return yield p;
+      });
+    }
+    module2.exports = { resolveLiveDomain: resolveLiveDomain2 };
+  }
+});
+
 // src/cc/index.js
 var { formatStream } = require_formatter();
 var { fetchWithTimeout } = require_fetch_helper();
+var { resolveLiveDomain } = require_domain_helper();
 var BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 function base64Decode(str) {
   try {
@@ -287,7 +330,8 @@ function base64Decode(str) {
     return "";
   }
 }
-var BASE_URL = base64Decode("aHR0cHM6Ly9jaW5lbWFjaXR5LmNj");
+var CC_DEFAULT = base64Decode("aHR0cHM6Ly9jaW5lbWFjaXR5LmNj");
+var BASE_URL = CC_DEFAULT;
 var USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
 var FETCH_TIMEOUT = 1e4;
 var STREAM_CHECK_TIMEOUT = 1e3;
@@ -821,6 +865,8 @@ function checkItalianAudioInPlaylist(url) {
 }
 function getStreams(id, type, season, episode, providerContext = null) {
   return __async(this, null, function* () {
+    BASE_URL = yield resolveLiveDomain(CC_DEFAULT);
+    SITEMAP_URL = `${BASE_URL}/news_pages.xml`;
     const parsedRequest = parseCompositeSeriesId(id, season, episode);
     id = parsedRequest.normalizedId;
     season = parsedRequest.season;

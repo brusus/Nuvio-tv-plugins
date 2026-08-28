@@ -1,11 +1,13 @@
 "use strict";
 
 const { formatStream } = require("../formatter.js");
+const { resolveLiveDomain } = require("../domain_helper.js");
 const { checkQualityFromPlaylist } = require("../quality_helper.js");
 const { createTimeoutSignal } = require("../fetch_helper.js");
 
+let worldBaseUrl = "https://www.animeworld.ac";
 function getWorldBaseUrl() {
-  return "https://www.animeworld.ac";
+  return worldBaseUrl;
 }
 
 function getMappingApiBase() {
@@ -1028,6 +1030,7 @@ async function mapLimit(values, limit, mapper) {
 }
 
 async function getStreams(id, type, season, episode, providerContext = null) {
+  worldBaseUrl = await resolveLiveDomain("https://www.animeworld.ac");
   try {
     const lookup = resolveLookupRequest(id, season, episode, providerContext);
     if (!lookup) return [];

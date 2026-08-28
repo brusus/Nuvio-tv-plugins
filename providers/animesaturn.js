@@ -189,6 +189,48 @@ var require_formatter = __commonJS({
   }
 });
 
+// src/domain_helper.js
+var require_domain_helper = __commonJS({
+  "src/domain_helper.js"(exports2, module2) {
+    var DEFAULT_UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
+    var _cache = /* @__PURE__ */ new Map();
+    function resolveLiveDomain2(startUrl, userAgent) {
+      return __async(this, null, function* () {
+        const start = String(startUrl || "").replace(/\/+$/, "");
+        if (!start) return start;
+        if (_cache.has(start)) return yield _cache.get(start);
+        const p = (() => __async(null, null, function* () {
+          try {
+            const res = yield fetch(start + "/", {
+              headers: {
+                "User-Agent": userAgent || DEFAULT_UA,
+                "Accept-Language": "it-IT,it;q=0.9"
+              }
+            });
+            if (res && res.body && typeof res.body.cancel === "function") {
+              res.body.cancel().catch(() => {
+              });
+            }
+            if (res && res.ok && res.url) {
+              const origin = new URL(res.url).origin;
+              if (origin && origin !== start) {
+                console.log("[domain] spostato: " + start + " -> " + origin);
+              }
+              return origin || start;
+            }
+            return start;
+          } catch (_) {
+            return start;
+          }
+        }))();
+        _cache.set(start, p);
+        return yield p;
+      });
+    }
+    module2.exports = { resolveLiveDomain: resolveLiveDomain2 };
+  }
+});
+
 // src/fetch_helper.js
 var require_fetch_helper = __commonJS({
   "src/fetch_helper.js"(exports2, module2) {
@@ -363,11 +405,13 @@ var require_common = __commonJS({
 
 // src/animesaturn/index.js
 var { formatStream } = require_formatter();
+var { resolveLiveDomain } = require_domain_helper();
 var { checkQualityFromPlaylist } = require_quality_helper();
 var { createTimeoutSignal } = require_fetch_helper();
 var { getProxiedUrl } = require_common();
+var saturnBaseUrl = "https://www.animesaturn.net";
 function getSaturnBaseUrl() {
-  return "https://www.animesaturn.net";
+  return saturnBaseUrl;
 }
 function getMappingApiBase() {
   return "https://animemapping.realbestia.com";
@@ -1359,6 +1403,7 @@ function resolveEpisodeFromMappingPayload(mappingPayload, fallbackEpisode) {
 function getStreams(id, type, season, episode, providerContext = null) {
   return __async(this, null, function* () {
     var _a;
+    saturnBaseUrl = yield resolveLiveDomain("https://www.animesaturn.net");
     try {
       const lookup = resolveLookupRequest(id, season, episode, providerContext);
       if (!lookup) return [];
