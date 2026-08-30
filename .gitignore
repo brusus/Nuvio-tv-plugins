@@ -17,3 +17,4 @@ cf-session-maxstream.json
 /downloaded_files
 cinemacity-sitemap.json
 .heal-summary.txt
+.env

@@ -86,8 +86,12 @@ const SC_DEFAULT_SITE = 'https://streamingunity.vip';
 // Dopo averli compilati: node build.js, poi commit e push.
 // Lasciandoli vuoti il provider funziona come prima, in anonimo a 720p.
 // ===========================================================================
-const SC_ACCOUNT_EMAIL = '';
-const SC_ACCOUNT_PASSWORD = '';
+// Credenziali del piano premium. NON vanno scritte qui: questo file e' pubblico
+// e verrebbero raccolte. Si iniettano solo sul server/addon (Docker) via variabile
+// d'ambiente, da un file .env locale che resta sul server. Nel plugin pubblico
+// (QuickJS) process.env e' vuoto, quindi restano vuote e il provider e' anonimo (720p).
+const SC_ACCOUNT_EMAIL = (typeof process !== 'undefined' && process.env && process.env.SC_ACCOUNT_EMAIL) || '';
+const SC_ACCOUNT_PASSWORD = (typeof process !== 'undefined' && process.env && process.env.SC_ACCOUNT_PASSWORD) || '';
 
 // Impostazioni fornite dall'app a runtime (globalThis.SCRAPER_SETTINGS) oppure,
 // quando il provider gira lato server, da variabile d'ambiente. Non esiste un
@@ -210,6 +214,12 @@ async function ensureSession() {
 
       const response = await fetch(base + "/login", {
         method: "POST",
+        // redirect: "manual" e' essenziale: un login riuscito risponde 302 e
+        // imposta il cookie di sessione AUTENTICATO proprio su quella risposta.
+        // Seguendo il redirect, fetch non porta quel cookie e la sessione resta
+        // anonima (auth.user = null), con la sola qualita' 720p. Fermandoci al
+        // 302 catturiamo il cookie autenticato.
+        redirect: "manual",
         headers: {
           "User-Agent": USER_AGENT,
           "Cookie": jar,
@@ -230,11 +240,11 @@ async function ensureSession() {
       // Si registra solo il codice HTTP: le credenziali non vanno nei log.
       console.log("[StreamingCommunity] Login premium: HTTP " + response.status);
 
-      // Un login rifiutato (fetch non lancia sugli status di errore) non deve
-      // essere cachato come sessione valida. Su errore di autenticazione (4xx)
-      // si ripiega in anonimo senza reinsistere (""); su errore server (5xx) si
-      // lascia null cosi' che una chiamata successiva ritenti.
-      if (!response.ok) {
+      // Con redirect:manual il successo e' un 3xx (302 verso la home); un 2xx e'
+      // comunque accettato. Solo 4xx = credenziali/CSRF rifiutati (anonimo);
+      // 5xx = errore server, si ritenta al giro successivo.
+      const loginOk = response.ok || (response.status >= 300 && response.status < 400);
+      if (!loginOk) {
         if (response.status >= 500) {
           scSessionCookie = null;          // errore server: ritenta al prossimo giro
         } else {

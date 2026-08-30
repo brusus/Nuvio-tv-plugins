@@ -5,6 +5,10 @@ services:
     ports:
       - "7000:7000"
     environment:
+      # Credenziali del piano premium StreamingCommunity: lette da un file .env
+      # locale (NON committato). Lascia vuoto per usare l'addon in anonimo (720p).
+      - SC_ACCOUNT_EMAIL=${SC_ACCOUNT_EMAIL:-}
+      - SC_ACCOUNT_PASSWORD=${SC_ACCOUNT_PASSWORD:-}
       - PORT=7000
       - NODE_ENV=production
       - VERBOSE_LOGS=0

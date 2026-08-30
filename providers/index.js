@@ -8320,8 +8320,8 @@ var require_streamingcommunity = __commonJS({
       ProxyAgent = null;
     }
     var SC_DEFAULT_SITE = "https://streamingunity.vip";
-    var SC_ACCOUNT_EMAIL = "";
-    var SC_ACCOUNT_PASSWORD = "";
+    var SC_ACCOUNT_EMAIL = typeof process !== "undefined" && process.env && process.env.SC_ACCOUNT_EMAIL || "";
+    var SC_ACCOUNT_PASSWORD = typeof process !== "undefined" && process.env && process.env.SC_ACCOUNT_PASSWORD || "";
     function getSetting(settingName, envName) {
       try {
         const settings = typeof globalThis !== "undefined" && globalThis.SCRAPER_SETTINGS || {};
@@ -8417,6 +8417,12 @@ var require_streamingcommunity = __commonJS({
             jar = mergeCookies(jar, getResponseCookies(csrf));
             const response = yield fetch(base + "/login", {
               method: "POST",
+              // redirect: "manual" e' essenziale: un login riuscito risponde 302 e
+              // imposta il cookie di sessione AUTENTICATO proprio su quella risposta.
+              // Seguendo il redirect, fetch non porta quel cookie e la sessione resta
+              // anonima (auth.user = null), con la sola qualita' 720p. Fermandoci al
+              // 302 catturiamo il cookie autenticato.
+              redirect: "manual",
               headers: {
                 "User-Agent": USER_AGENT,
                 "Cookie": jar,
@@ -8434,7 +8440,8 @@ var require_streamingcommunity = __commonJS({
             });
             jar = mergeCookies(jar, getResponseCookies(response));
             console.log("[StreamingCommunity] Login premium: HTTP " + response.status);
-            if (!response.ok) {
+            const loginOk = response.ok || response.status >= 300 && response.status < 400;
+            if (!loginOk) {
               if (response.status >= 500) {
                 scSessionCookie = null;
               } else {
