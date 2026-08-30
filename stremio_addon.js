@@ -2533,11 +2533,9 @@ builder.defineStreamHandler(async ({ type, id, config = {} }) => {
                             if (fillerTag) {
                                 titleUI += `\n${fillerTag}`;
                             }
-                            titleUI += `\n${s.providerName || s.name || 'EasyStreams'}`;
+                            titleUI += `\n${s.providerName || s.name || 'Sorgente'}`;
                             if (s.language) {
-                                titleUI += `\n🗣️ ${s.language}  🔍EasyStreams`;
-                            } else {
-                                titleUI += `\n🔍EasyStreams`;
+                                titleUI += `\n🗣️ ${s.language}`;
                             }
                             if (streamDescription === DUAL_CACHE_MISS_DESCRIPTION) {
                                 titleUI += `\n⚠️ ${streamDescription}`;
