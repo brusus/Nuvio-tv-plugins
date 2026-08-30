@@ -29,6 +29,13 @@ WARP_BYPASS_HOSTS=(
     '*.cccdn.net'
     'api.shegu.st'
     'info.movieboxnoob.cc'
+    # StreamingCommunity: sito, CDN e host media/embed escono dall'IP di casa
+    # (residenziale) invece che da WARP, cosi' la sessione premium non viene
+    # trattata come IP datacenter e puo' servire il 1080p.
+    'streamingunity.vip'
+    '*.streamingunity.vip'
+    'dancingmonkeyvideolover.xyz'
+    'vixcloud.co'
 )
 for host in "${WARP_BYPASS_HOSTS[@]}"; do
     echo "[WARP] Escludo $host dal tunnel..."
