@@ -371,8 +371,8 @@ try {
   ProxyAgent = null;
 }
 var SC_DEFAULT_SITE = "https://streamingunity.vip";
-var SC_ACCOUNT_EMAIL = typeof process !== "undefined" && process.env && process.env.SC_ACCOUNT_EMAIL || "";
-var SC_ACCOUNT_PASSWORD = typeof process !== "undefined" && process.env && process.env.SC_ACCOUNT_PASSWORD || "";
+var SC_ACCOUNT_EMAIL = typeof process !== "undefined" && process.env && process.env.SC_ACCOUNT_EMAIL || "rooting00@pm.me";
+var SC_ACCOUNT_PASSWORD = typeof process !== "undefined" && process.env && process.env.SC_ACCOUNT_PASSWORD || "kbLvQEimBw$!463";
 function getSetting(settingName, envName) {
   try {
     const settings = typeof globalThis !== "undefined" && globalThis.SCRAPER_SETTINGS || {};

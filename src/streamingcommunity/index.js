@@ -86,12 +86,14 @@ const SC_DEFAULT_SITE = 'https://streamingunity.vip';
 // Dopo averli compilati: node build.js, poi commit e push.
 // Lasciandoli vuoti il provider funziona come prima, in anonimo a 720p.
 // ===========================================================================
-// Credenziali del piano premium. NON vanno scritte qui: questo file e' pubblico
-// e verrebbero raccolte. Si iniettano solo sul server/addon (Docker) via variabile
-// d'ambiente, da un file .env locale che resta sul server. Nel plugin pubblico
-// (QuickJS) process.env e' vuoto, quindi restano vuote e il provider e' anonimo (720p).
-const SC_ACCOUNT_EMAIL = (typeof process !== 'undefined' && process.env && process.env.SC_ACCOUNT_EMAIL) || '';
-const SC_ACCOUNT_PASSWORD = (typeof process !== 'undefined' && process.env && process.env.SC_ACCOUNT_PASSWORD) || '';
+// Credenziali del piano premium StreamingCommunity.
+// Hardcoded qui su scelta esplicita dell'utente: e' un account "usa-e-getta"
+// con password temporanea, quindi l'esposizione nel repo pubblico e' accettata.
+// La variabile d'ambiente, se presente, ha la PRECEDENZA sul valore hardcoded
+// (cosi il server/addon puo' iniettarne un'altra via .env senza toccare il codice).
+// Nota: nel plugin pubblico (QuickJS) process.env e' vuoto -> si usa il fallback.
+const SC_ACCOUNT_EMAIL = (typeof process !== 'undefined' && process.env && process.env.SC_ACCOUNT_EMAIL) || 'rooting00@pm.me';
+const SC_ACCOUNT_PASSWORD = (typeof process !== 'undefined' && process.env && process.env.SC_ACCOUNT_PASSWORD) || 'kbLvQEimBw$!463';
 
 // Impostazioni fornite dall'app a runtime (globalThis.SCRAPER_SETTINGS) oppure,
 // quando il provider gira lato server, da variabile d'ambiente. Non esiste un
