@@ -23,3 +23,16 @@ services:
     devices:
       - /dev/net/tun
     restart: unless-stopped
+
+  # Tunnel Cloudflare: espone l'addon (easystreams:7000) su un URL HTTPS pubblico,
+  # cosi' Stremio lo raggiunge da ovunque (telefono fuori casa, Stremio web) senza
+  # aprire porte sul router. "Quick tunnel": nessun account, URL casuale
+  # https://<parole>.trycloudflare.com. L'URL cambia a ogni riavvio del container
+  # (per un URL fisso serve un tunnel "named" con account Cloudflare - vedi note).
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    command: tunnel --no-autoupdate --url http://easystreams:7000
+    depends_on:
+      - easystreams
+    restart: unless-stopped
