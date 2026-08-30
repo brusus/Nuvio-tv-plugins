@@ -535,7 +535,13 @@ function extractMasterPlaylistFromEmbedHtml(html, preferActiveStream = false) {
   return {
     token: tokenMatch[1],
     expires: expiresMatch[1],
-    url: playlistUrl
+    url: playlistUrl,
+    // Il flag premium 1080p sta nell'HTML (window.canPlayFHD = true), impostato
+    // dal sito quando la sessione e' autenticata premium. E' il segnale
+    // affidabile: gli altri estrattori del repo (vixcloud, animeunity) leggono
+    // questo dall'HTML, non dal query dell'URL. Senza, h=1 non viene mai
+    // aggiunto e il flusso resta a 720p anche da premium.
+    canPlayFHD: /window\.canPlayFHD\s*=\s*true/i.test(html)
   };
 }
 
@@ -732,7 +738,7 @@ async function getStreams(id, type, season, episode, providerContext = null) {
       const playlistParams = [
         ['token', masterPlaylist.token],
         ['expires', masterPlaylist.expires],
-        ...(embedParams.get('canPlayFHD') ? [['h', '1']] : []),
+        ...((masterPlaylist.canPlayFHD || embedParams.get('canPlayFHD')) ? [['h', '1']] : []),
         ...(embedParams.get('scz') ? [['scz', '1']] : []),
         ['lang', embedParams.get('lang') || 'en']
       ];

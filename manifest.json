@@ -167,7 +167,7 @@
     {
       "id": "easystreams-streamingcommunity",
       "name": "StreamingCommunity",
-      "version": "1.2.5",
+      "version": "1.2.6",
       "description": "Movies and Series from StreamingCommunity",
       "resources": [
         "stream"
