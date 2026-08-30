@@ -86,8 +86,8 @@ const SC_DEFAULT_SITE = 'https://streamingunity.vip';
 // Dopo averli compilati: node build.js, poi commit e push.
 // Lasciandoli vuoti il provider funziona come prima, in anonimo a 720p.
 // ===========================================================================
-const SC_ACCOUNT_EMAIL = 'rooting00@pm.me';
-const SC_ACCOUNT_PASSWORD = 'N.kwbU7KUHsLpg6';
+const SC_ACCOUNT_EMAIL = '';
+const SC_ACCOUNT_PASSWORD = '';
 
 // Impostazioni fornite dall'app a runtime (globalThis.SCRAPER_SETTINGS) oppure,
 // quando il provider gira lato server, da variabile d'ambiente. Non esiste un

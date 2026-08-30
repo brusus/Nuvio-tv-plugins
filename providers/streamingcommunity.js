@@ -371,8 +371,8 @@ try {
   ProxyAgent = null;
 }
 var SC_DEFAULT_SITE = "https://streamingunity.vip";
-var SC_ACCOUNT_EMAIL = "rooting00@pm.me";
-var SC_ACCOUNT_PASSWORD = "N.kwbU7KUHsLpg6";
+var SC_ACCOUNT_EMAIL = "";
+var SC_ACCOUNT_PASSWORD = "";
 function getSetting(settingName, envName) {
   try {
     const settings = typeof globalThis !== "undefined" && globalThis.SCRAPER_SETTINGS || {};
