@@ -8320,8 +8320,12 @@ var require_streamingcommunity = __commonJS({
       ProxyAgent = null;
     }
     var SC_DEFAULT_SITE = "https://streamingunity.vip";
-    var SC_ACCOUNT_EMAIL = typeof process !== "undefined" && process.env && process.env.SC_ACCOUNT_EMAIL || "rooting00@pm.me";
-    var SC_ACCOUNT_PASSWORD = typeof process !== "undefined" && process.env && process.env.SC_ACCOUNT_PASSWORD || "kbLvQEimBw$!463";
+    function getScAccountEmail() {
+      return getSetting("email", "SC_ACCOUNT_EMAIL") || "rooting00@pm.me";
+    }
+    function getScAccountPassword() {
+      return getSetting("password", "SC_ACCOUNT_PASSWORD") || "kbLvQEimBw$!463";
+    }
     function getSetting(settingName, envName) {
       try {
         const settings = typeof globalThis !== "undefined" && globalThis.SCRAPER_SETTINGS || {};
@@ -8395,7 +8399,9 @@ var require_streamingcommunity = __commonJS({
         const base = getSiteBase();
         if (scSessionCookie !== null && scSessionBase === base) return scSessionCookie;
         if (scSessionPromise) return yield scSessionPromise;
-        if (!SC_ACCOUNT_EMAIL || !SC_ACCOUNT_PASSWORD) {
+        const scAccountEmail = getScAccountEmail();
+        const scAccountPassword = getScAccountPassword();
+        if (!scAccountEmail || !scAccountPassword) {
           scSessionCookie = "";
           scSessionBase = base;
           return "";
@@ -8436,7 +8442,7 @@ var require_streamingcommunity = __commonJS({
               // Il form di login del sito usa il campo "username" (che accetta
               // l'indirizzo email come valore), non "email": mandare "email" fa
               // rispondere 422 "The username field is required".
-              body: "username=" + encodeURIComponent(SC_ACCOUNT_EMAIL) + "&password=" + encodeURIComponent(SC_ACCOUNT_PASSWORD)
+              body: "username=" + encodeURIComponent(scAccountEmail) + "&password=" + encodeURIComponent(scAccountPassword)
             });
             jar = mergeCookies(jar, getResponseCookies(response));
             console.log("[StreamingCommunity] Login premium: HTTP " + response.status);

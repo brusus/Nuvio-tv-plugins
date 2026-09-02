@@ -353,7 +353,7 @@ var { formatStream } = require_formatter();
 var { resolveLiveDomain } = require_domain_helper();
 var { getQualityFromUrl } = require_quality_helper();
 var TMDB_API_KEY = "68e094699525b18a70bab2f86b1fa706";
-var BASE_URL = "https://cb01uno.lat";
+var BASE_URL = "https://cb01uno.baby";
 var USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 var REQUEST_TIMEOUT_MS = 15e3;
 var MAX_CANDIDATES = 5;
@@ -573,7 +573,7 @@ function toMixDropEmbed(rawUrl) {
 }
 function getStreams(id, type, season, episode, providerContext = null) {
   return __async(this, null, function* () {
-    BASE_URL = yield resolveLiveDomain("https://cb01uno.lat");
+    BASE_URL = yield resolveLiveDomain("https://cb01uno.baby");
     const normalizedType = String(type || "").toLowerCase();
     if (normalizedType !== "movie") return [];
     const tmdbId = yield resolveTmdbId(id, "movie", providerContext);

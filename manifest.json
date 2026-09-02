@@ -276,7 +276,7 @@
     {
       "id": "nuviotv-cb01",
       "name": "CB01",
-      "version": "1.0.7",
+      "version": "1.0.8",
       "description": "Film da CB01 (solo film: le serie passano da uprot, che richiede un captcha)",
       "resources": [
         "stream"
