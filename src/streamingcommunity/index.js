@@ -89,11 +89,17 @@ const SC_DEFAULT_SITE = 'https://streamingunity.vip';
 // Credenziali del piano premium StreamingCommunity.
 // Hardcoded qui su scelta esplicita dell'utente: e' un account "usa-e-getta"
 // con password temporanea, quindi l'esposizione nel repo pubblico e' accettata.
-// La variabile d'ambiente, se presente, ha la PRECEDENZA sul valore hardcoded
-// (cosi il server/addon puo' iniettarne un'altra via .env senza toccare il codice).
-// Nota: nel plugin pubblico (QuickJS) process.env e' vuoto -> si usa il fallback.
-const SC_ACCOUNT_EMAIL = (typeof process !== 'undefined' && process.env && process.env.SC_ACCOUNT_EMAIL) || 'rooting00@pm.me';
-const SC_ACCOUNT_PASSWORD = (typeof process !== 'undefined' && process.env && process.env.SC_ACCOUNT_PASSWORD) || 'kbLvQEimBw$!463';
+// Precedenza: account personale inserito dall'utente nell'app (login nella
+// schermata Plugin di Nuvio, settingName 'email'/'password') > variabile
+// d'ambiente (lato server/addon) > account condiviso hardcoded qui sotto.
+// Nota: nel plugin pubblico (QuickJS) process.env e' vuoto -> si usa SCRAPER_SETTINGS
+// se l'utente ha effettuato il login, altrimenti il fallback condiviso.
+function getScAccountEmail() {
+  return getSetting('email', 'SC_ACCOUNT_EMAIL') || 'rooting00@pm.me';
+}
+function getScAccountPassword() {
+  return getSetting('password', 'SC_ACCOUNT_PASSWORD') || 'kbLvQEimBw$!463';
+}
 
 // Impostazioni fornite dall'app a runtime (globalThis.SCRAPER_SETTINGS) oppure,
 // quando il provider gira lato server, da variabile d'ambiente. Non esiste un
@@ -191,7 +197,9 @@ async function ensureSession() {
   // il cookie del vecchio dominio non vale e va rifatto il login.
   if (scSessionCookie !== null && scSessionBase === base) return scSessionCookie;
   if (scSessionPromise) return await scSessionPromise;
-  if (!SC_ACCOUNT_EMAIL || !SC_ACCOUNT_PASSWORD) {
+  const scAccountEmail = getScAccountEmail();
+  const scAccountPassword = getScAccountPassword();
+  if (!scAccountEmail || !scAccountPassword) {
     scSessionCookie = "";
     scSessionBase = base;
     return "";
@@ -235,8 +243,8 @@ async function ensureSession() {
         // Il form di login del sito usa il campo "username" (che accetta
         // l'indirizzo email come valore), non "email": mandare "email" fa
         // rispondere 422 "The username field is required".
-        body: "username=" + encodeURIComponent(SC_ACCOUNT_EMAIL) +
-              "&password=" + encodeURIComponent(SC_ACCOUNT_PASSWORD)
+        body: "username=" + encodeURIComponent(scAccountEmail) +
+              "&password=" + encodeURIComponent(scAccountPassword)
       });
       jar = mergeCookies(jar, getResponseCookies(response));
       // Si registra solo il codice HTTP: le credenziali non vanno nei log.
