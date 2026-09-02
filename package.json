@@ -2,12 +2,10 @@
   "name": "easystreams",
   "version": "1.3.16",
   "description": "",
-  "main": "stremio_addon.js",
+  "main": "build.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node stremio_addon.js",
-    "start-addon": "node stremio_addon.js",
-    "test:providers": "node scripts/provider-latency-test.js"
+    "build": "node build.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
@@ -18,10 +16,8 @@
     "cheerio": "^1.2.0",
     "crypto-js": "^4.2.0",
     "esbuild": "^0.27.3",
-    "express": "^5.2.1",
     "https-proxy-agent": "^7.0.6",
     "node-fetch": "^2.7.0",
-    "undici": "^7.24.7",
-    "stremio-addon-sdk": "^1.6.10"
+    "undici": "^7.24.7"
   }
 }
