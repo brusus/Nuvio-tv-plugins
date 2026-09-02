@@ -1,0 +1,30 @@
+name: Build Check
+
+# Ricompila tutti i bundle ad ogni push/PR su main, cosi' un provider rotto
+# (sintassi non valida, file mancante, ecc.) fa fallire subito il check
+# invece di restare inosservato fino al prossimo giro di Heal Domains.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        run: npm install --no-audit --no-fund
+
+      - name: Build all provider bundles
+        run: node build.js

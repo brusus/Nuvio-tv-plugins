@@ -7,6 +7,13 @@ const PROVIDERS_DIR = path.join(__dirname, 'providers');
 const SRC_DIR = path.join(__dirname, 'src');
 const STREMIO_ONLY_PROVIDERS = new Set(['mediaset', 'raiplay']);
 
+// Every catch block below only logs and continues, so a broken bundle never
+// failed the process (exit code stayed 0). That meant a bad build could get
+// committed and pushed - by a human running `node build.js` locally, or by
+// the hourly Heal Domains workflow - with nothing catching it. This flag
+// makes any build failure surface as a non-zero exit code.
+let hadFailures = false;
+
 async function build() {
     const args = process.argv.slice(2);
     const shouldTranspile = args.includes('--transpile');
@@ -55,6 +62,7 @@ async function buildIndexBundle(minify = false) {
         console.log('✅ Built index bundle');
     } catch (e) {
         console.error('❌ Failed to build index bundle:', e.message);
+        hadFailures = true;
     }
 }
 
@@ -63,6 +71,7 @@ async function transpileProviders(specificFiles = [], minify = false) {
 
     if (!fs.existsSync(PROVIDERS_DIR)) {
         console.error('Providers directory not found!');
+        hadFailures = true;
         return;
     }
 
@@ -94,6 +103,7 @@ async function transpileProviders(specificFiles = [], minify = false) {
             console.log(`✅ Transpiled ${file}`);
         } catch (e) {
             console.error(`❌ Failed to transpile ${file}:`, e.message);
+            hadFailures = true;
         }
     }
 }
@@ -154,10 +164,21 @@ async function buildSourceProviders(specificProviders = [], minify = false) {
             console.log(`✅ Built ${provider}`);
         } catch (e) {
             console.error(`❌ Failed to build ${provider}:`, e.message);
+            hadFailures = true;
         }
     }
 }
 
 
 
-build().catch(console.error);
+build()
+    .then(() => {
+        if (hadFailures) {
+            console.error('\nBuild finished with errors (see ❌ lines above).');
+            process.exitCode = 1;
+        }
+    })
+    .catch((e) => {
+        console.error(e);
+        process.exitCode = 1;
+    });
