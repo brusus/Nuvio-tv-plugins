@@ -372,10 +372,10 @@ try {
 }
 var SC_DEFAULT_SITE = "https://streamingunity.vip";
 function getScAccountEmail() {
-  return getSetting("email", "SC_ACCOUNT_EMAIL") || "rooting00@pm.me";
+  return getSetting("email", "SC_ACCOUNT_EMAIL");
 }
 function getScAccountPassword() {
-  return getSetting("password", "SC_ACCOUNT_PASSWORD") || "kbLvQEimBw$!463";
+  return getSetting("password", "SC_ACCOUNT_PASSWORD");
 }
 function getSetting(settingName, envName) {
   try {

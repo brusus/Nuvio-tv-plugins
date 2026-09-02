@@ -87,18 +87,17 @@ const SC_DEFAULT_SITE = 'https://streamingunity.vip';
 // Lasciandoli vuoti il provider funziona come prima, in anonimo a 720p.
 // ===========================================================================
 // Credenziali del piano premium StreamingCommunity.
-// Hardcoded qui su scelta esplicita dell'utente: e' un account "usa-e-getta"
-// con password temporanea, quindi l'esposizione nel repo pubblico e' accettata.
-// Precedenza: account personale inserito dall'utente nell'app (login nella
-// schermata Plugin di Nuvio, settingName 'email'/'password') > variabile
-// d'ambiente (lato server/addon) > account condiviso hardcoded qui sotto.
-// Nota: nel plugin pubblico (QuickJS) process.env e' vuoto -> si usa SCRAPER_SETTINGS
-// se l'utente ha effettuato il login, altrimenti il fallback condiviso.
+// NON sono scritte nel codice: questo file e' pubblico su GitHub e qualunque
+// credenziale committata qui sarebbe leggibile da chiunque.
+// Provenienza: account personale inserito dall'utente nell'app (login nella
+// schermata Plugin di Nuvio, settingName 'email'/'password') oppure, lato
+// server/addon, variabile d'ambiente (SC_ACCOUNT_EMAIL / SC_ACCOUNT_PASSWORD).
+// Senza nessuno dei due, il provider funziona in anonimo (720p).
 function getScAccountEmail() {
-  return getSetting('email', 'SC_ACCOUNT_EMAIL') || 'rooting00@pm.me';
+  return getSetting('email', 'SC_ACCOUNT_EMAIL');
 }
 function getScAccountPassword() {
-  return getSetting('password', 'SC_ACCOUNT_PASSWORD') || 'kbLvQEimBw$!463';
+  return getSetting('password', 'SC_ACCOUNT_PASSWORD');
 }
 
 // Impostazioni fornite dall'app a runtime (globalThis.SCRAPER_SETTINGS) oppure,
