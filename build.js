@@ -5,7 +5,7 @@ const path = require('path');
 // Configuration
 const PROVIDERS_DIR = path.join(__dirname, 'providers');
 const SRC_DIR = path.join(__dirname, 'src');
-const STREMIO_ONLY_PROVIDERS = new Set(['mediaset', 'raiplay']);
+const STREMIO_ONLY_PROVIDERS = new Set(['mediaset']);
 
 // Every catch block below only logs and continues, so a broken bundle never
 // failed the process (exit code stayed 0). That meant a bad build could get
