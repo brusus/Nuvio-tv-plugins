@@ -14,7 +14,6 @@ const MIN_MATCH_SCORE = 0.63;
 const DEBUG = typeof process !== 'undefined' && process.env && process.env.OFFICIAL_PROVIDER_DEBUG === '1';
 
 function debug(message, error) {
-  if (!DEBUG) return;
   console.warn(`[OfficialVOD] ${message}${error ? `: ${error.message || error}` : ''}`);
 }
 
@@ -1143,12 +1142,14 @@ async function getOfficialStreams(provider, id, type, season, episode, context =
     // of bailing out entirely.
     if (!proxyEntries.length && provider !== 'raiplay') return [];
     const target = await resolveTarget(id, type, season, episode, context || {});
+    debug(`resolveTarget result: ${target ? JSON.stringify(target) : 'null'}`);
     if (!target) return [];
     const all = [];
     for (const query of buildQueries(target)) {
       const found = provider === 'raiplay'
         ? await searchRai(query, target)
         : await searchMediaset(query, target);
+      debug(`query "${query}" -> ${found.length} candidates`);
       all.push(...found);
       const ranked = deduplicate(all)
         .map((candidate) => ({ ...candidate, score: scoreCandidate(target, candidate) }))
@@ -1194,6 +1195,7 @@ async function getOfficialStreams(provider, id, type, season, episode, context =
       })
       .sort((left, right) => compareOfficialCandidates(target, left, right))
       .slice(0, 6);
+    debug(`ranked candidates after filter: ${ranked.length}`);
     for (const candidate of ranked) {
       try {
         // Mediaset playback checks are intentionally delegated to EasyProxy.

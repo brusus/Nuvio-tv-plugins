@@ -205,7 +205,6 @@ var require_official_vod = __commonJS({
     var MIN_MATCH_SCORE = 0.63;
     var DEBUG = typeof process !== "undefined" && process.env && process.env.OFFICIAL_PROVIDER_DEBUG === "1";
     function debug(message, error) {
-      if (!DEBUG) return;
       console.warn(`[OfficialVOD] ${message}${error ? `: ${error.message || error}` : ""}`);
     }
     function cacheGet(key) {
@@ -1247,10 +1246,12 @@ var require_official_vod = __commonJS({
           const proxyEntries = resolveProxyEntries(context || {});
           if (!proxyEntries.length && provider !== "raiplay") return [];
           const target = yield resolveTarget(id, type, season, episode, context || {});
+          debug(`resolveTarget result: ${target ? JSON.stringify(target) : "null"}`);
           if (!target) return [];
           const all = [];
           for (const query of buildQueries(target)) {
             const found = provider === "raiplay" ? yield searchRai(query, target) : yield searchMediaset(query, target);
+            debug(`query "${query}" -> ${found.length} candidates`);
             all.push(...found);
             const ranked2 = deduplicate(all).map((candidate) => __spreadProps(__spreadValues({}, candidate), { score: scoreCandidate(target, candidate) })).sort((left, right) => compareOfficialCandidates(target, left, right));
             const best = ranked2[0];
@@ -1269,6 +1270,7 @@ var require_official_vod = __commonJS({
             if (candidate.source === "witty" && candidate.isFullEpisode !== true) return false;
             return true;
           }).sort((left, right) => compareOfficialCandidates(target, left, right)).slice(0, 6);
+          debug(`ranked candidates after filter: ${ranked.length}`);
           for (const candidate of ranked) {
             try {
               const inspection = provider === "raiplay" ? yield inspectRaiCandidate(candidate) : { available: true, quality: "720p" };
