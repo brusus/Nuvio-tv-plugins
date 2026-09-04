@@ -1341,4 +1341,79 @@ async function getOfficialStreams(provider, id, type, season, episode, context =
   }
 }
 
-module.exports = { getOfficialStreams };
+const RAI_LIVE_RELINKER = 'https://mediapolis.rai.it/relinker/relinkerServlet.htm';
+
+// Resolves a live RAI channel stream (Rai 1, Rai News 24, ...) given its
+// raiplay.it slug (e.g. "rai1", "rainews24" - same slug used in
+// raiplay.it/dirette/<slug>). Independent of the VOD search/matching flow
+// above: there's nothing to search for, the channel list is fixed and the
+// caller already knows which one it wants.
+async function getRaiLiveStream(channelSlug) {
+  const slug = String(channelSlug || '').trim().toLowerCase();
+  if (!/^[a-z0-9]{2,24}$/.test(slug)) return [];
+  try {
+    const metaCacheKey = `rai-live-meta:${slug}`;
+    let meta = cacheGet(metaCacheKey);
+    if (!meta) {
+      const data = await fetchJson(`${RAI_ORIGIN}/dirette/${slug}.json`, {
+        headers: { origin: RAI_ORIGIN, referer: `${RAI_ORIGIN}/` }
+      }, 8000);
+      const contentUrl = data && data.video && data.video.content_url;
+      const contentId = contentUrl ? new URL(contentUrl).searchParams.get('cont') : null;
+      if (!contentId) return [];
+      meta = { contentId, name: data.channel || slug };
+      cacheSet(metaCacheKey, meta, 60 * 60 * 1000);
+    }
+    const authToken = await getRaiAuthToken();
+    const relinker = new URL(RAI_LIVE_RELINKER);
+    relinker.searchParams.set('cont', meta.contentId);
+    relinker.searchParams.set('output', '62');
+    const linkData = await fetchJson(relinker, {
+      headers: {
+        origin: RAI_ORIGIN,
+        referer: `${RAI_ORIGIN}/`,
+        ...(authToken ? { 'x-ua-token': authToken } : {})
+      }
+    }, 8000);
+    const manifest = String(linkData.video && linkData.video[0] || '');
+    const parsed = new URL(manifest);
+    const isUnavailablePlaceholder = /\/video_no_available\.mp4$/i.test(parsed.pathname)
+      || linkData.description === 'video non disponibile';
+    if (
+      isUnavailablePlaceholder
+      || parsed.protocol !== 'https:'
+      || !(
+        parsed.hostname.endsWith('.rai.it')
+        || parsed.hostname.endsWith('.akamaized.net')
+        || parsed.hostname.endsWith('.msvdn.net')
+      )
+    ) {
+      return [];
+    }
+    const stream = formatStream({
+      url: manifest,
+      name: 'RaiPlay',
+      title: `${cleanTitle(meta.name)} (Diretta)`,
+      quality: 'HD',
+      language: 'Italian',
+      type: 'direct',
+      headers: {
+        origin: RAI_ORIGIN,
+        referer: `${RAI_ORIGIN}/`,
+        'user-agent': USER_AGENT,
+        ...(authToken ? { 'x-ua-token': authToken } : {})
+      },
+      behaviorHints: {
+        notWebReady: true,
+        bingeGroup: 'raiplay-live',
+        filename: `${cleanTitle(meta.name).replace(/[^a-z0-9._ -]+/gi, ' ')}.m3u8`
+      }
+    }, 'RaiPlay');
+    return stream ? [stream] : [];
+  } catch (error) {
+    console.warn(`[RaiPlay Live] ${error.message}`);
+    return [];
+  }
+}
+
+module.exports = { getOfficialStreams, getRaiLiveStream, getRaiAuthToken };

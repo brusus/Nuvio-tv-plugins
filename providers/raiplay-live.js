@@ -1295,7 +1295,7 @@ var require_official_vod = __commonJS({
       }
       return candidate.source === "witty" ? "WittyTV" : "Mediaset Infinity";
     }
-    function getOfficialStreams2(_0, _1, _2, _3, _4) {
+    function getOfficialStreams(_0, _1, _2, _3, _4) {
       return __async(this, arguments, function* (provider, id, type, season, episode, context = {}) {
         try {
           const proxyEntries = resolveProxyEntries(context || {});
@@ -1371,7 +1371,7 @@ var require_official_vod = __commonJS({
       });
     }
     var RAI_LIVE_RELINKER = "https://mediapolis.rai.it/relinker/relinkerServlet.htm";
-    function getRaiLiveStream(channelSlug) {
+    function getRaiLiveStream2(channelSlug) {
       return __async(this, null, function* () {
         const slug = String(channelSlug || "").trim().toLowerCase();
         if (!/^[a-z0-9]{2,24}$/.test(slug)) return [];
@@ -1429,15 +1429,16 @@ var require_official_vod = __commonJS({
         }
       });
     }
-    module2.exports = { getOfficialStreams: getOfficialStreams2, getRaiLiveStream, getRaiAuthToken };
+    module2.exports = { getOfficialStreams, getRaiLiveStream: getRaiLiveStream2, getRaiAuthToken };
   }
 });
 
-// src/raiplay/index.js
-var { getOfficialStreams } = require_official_vod();
-function getStreams(id, type, season, episode, providerContext = null) {
+// src/raiplay-live/index.js
+var { getRaiLiveStream } = require_official_vod();
+function getStreams(id) {
   return __async(this, null, function* () {
-    return getOfficialStreams("raiplay", id, type, season, episode, providerContext || {});
+    const slug = String(id || "").replace(/^raitv:/i, "");
+    return getRaiLiveStream(slug);
   });
 }
 module.exports = { getStreams };
