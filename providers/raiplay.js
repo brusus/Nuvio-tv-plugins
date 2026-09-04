@@ -205,6 +205,7 @@ var require_official_vod = __commonJS({
     var MIN_MATCH_SCORE = 0.63;
     var DEBUG = typeof process !== "undefined" && process.env && process.env.OFFICIAL_PROVIDER_DEBUG === "1";
     function debug(message, error) {
+      if (!DEBUG) return;
       console.warn(`[OfficialVOD] ${message}${error ? `: ${error.message || error}` : ""}`);
     }
     function cacheGet(key) {
@@ -223,8 +224,9 @@ var require_official_vod = __commonJS({
     }
     function request(_0) {
       return __async(this, arguments, function* (url, options = {}, timeoutMs = 12e3) {
+        const hasTimers = typeof setTimeout !== "undefined" && typeof clearTimeout !== "undefined";
         const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-        const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+        const timer = controller && hasTimers ? setTimeout(() => controller.abort(), timeoutMs) : null;
         try {
           return yield fetch(url, __spreadProps(__spreadValues({}, options), {
             signal: controller ? controller.signal : options.signal,

@@ -14,6 +14,7 @@ const MIN_MATCH_SCORE = 0.63;
 const DEBUG = typeof process !== 'undefined' && process.env && process.env.OFFICIAL_PROVIDER_DEBUG === '1';
 
 function debug(message, error) {
+  if (!DEBUG) return;
   console.warn(`[OfficialVOD] ${message}${error ? `: ${error.message || error}` : ''}`);
 }
 
@@ -34,8 +35,12 @@ function cacheSet(key, value, ttlMs) {
 }
 
 async function request(url, options = {}, timeoutMs = 12000) {
+  // The plugin sandbox doesn't polyfill setTimeout/clearTimeout, so the
+  // abort-on-timeout mechanism has to be optional: without it every request
+  // here threw a synchronous ReferenceError before any network call was made.
+  const hasTimers = typeof setTimeout !== 'undefined' && typeof clearTimeout !== 'undefined';
   const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  const timer = (controller && hasTimers) ? setTimeout(() => controller.abort(), timeoutMs) : null;
   try {
     return await fetch(url, {
       ...options,
