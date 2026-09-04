@@ -61,6 +61,8 @@ async function getRaiAuthToken() {
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
   try {
+    console.warn('[RaiPlay Live DIAG] login: starting POST to ' + RAI_AUTH_URL);
+    const tLogin = Date.now();
     const body = new URLSearchParams({ email, password, domainApiKey: RAI_DOMAIN_API_KEY });
     const data = await fetchJson(RAI_AUTH_URL, {
       method: 'POST',
@@ -71,8 +73,9 @@ async function getRaiAuthToken() {
       },
       body: body.toString()
     }, 10000);
+    console.warn(`[RaiPlay Live DIAG] login: response received after ${Date.now() - tLogin}ms, response=${data && data.response}`);
     if (data.response !== 'OK' || !data.ua) {
-      debug(`RaiPlay login failed: ${data.message || data.detail || 'unknown error'}`);
+      console.warn(`[RaiPlay Live DIAG] login failed: ${data.message || data.detail || 'unknown error'}`);
       return null;
     }
     // The authorization field is a JWT whose payload carries the real
@@ -1352,22 +1355,28 @@ async function getRaiLiveStream(channelSlug) {
   const slug = String(channelSlug || '').trim().toLowerCase();
   if (!/^[a-z0-9]{2,24}$/.test(slug)) return [];
   try {
+    const t0 = Date.now();
     const metaCacheKey = `rai-live-meta:${slug}`;
     let meta = cacheGet(metaCacheKey);
     if (!meta) {
+      console.warn(`[RaiPlay Live DIAG] fetching metadata for ${slug}`);
       const data = await fetchJson(`${RAI_ORIGIN}/dirette/${slug}.json`, {
         headers: { origin: RAI_ORIGIN, referer: `${RAI_ORIGIN}/` }
       }, 8000);
+      console.warn(`[RaiPlay Live DIAG] metadata ok at +${Date.now() - t0}ms`);
       const contentUrl = data && data.video && data.video.content_url;
       const contentId = contentUrl ? new URL(contentUrl).searchParams.get('cont') : null;
       if (!contentId) return [];
       meta = { contentId, name: data.channel || slug };
       cacheSet(metaCacheKey, meta, 60 * 60 * 1000);
     }
+    console.warn(`[RaiPlay Live DIAG] requesting auth token at +${Date.now() - t0}ms`);
     const authToken = await getRaiAuthToken();
+    console.warn(`[RaiPlay Live DIAG] authToken=${authToken ? 'present(' + authToken.length + ')' : 'null'} at +${Date.now() - t0}ms`);
     const relinker = new URL(RAI_LIVE_RELINKER);
     relinker.searchParams.set('cont', meta.contentId);
     relinker.searchParams.set('output', '62');
+    console.warn(`[RaiPlay Live DIAG] fetching relinker at +${Date.now() - t0}ms url=${relinker.href}`);
     const linkData = await fetchJson(relinker, {
       headers: {
         origin: RAI_ORIGIN,
@@ -1375,6 +1384,7 @@ async function getRaiLiveStream(channelSlug) {
         ...(authToken ? { 'x-ua-token': authToken } : {})
       }
     }, 8000);
+    console.warn(`[RaiPlay Live DIAG] relinker ok at +${Date.now() - t0}ms`);
     const manifest = String(linkData.video && linkData.video[0] || '');
     const parsed = new URL(manifest);
     const isUnavailablePlaceholder = /\/video_no_available\.mp4$/i.test(parsed.pathname)
@@ -1411,7 +1421,7 @@ async function getRaiLiveStream(channelSlug) {
     }, 'RaiPlay');
     return stream ? [stream] : [];
   } catch (error) {
-    console.warn(`[RaiPlay Live] ${error.message}`);
+    console.warn(`[RaiPlay Live] ${error && error.message} | stack=${error && error.stack}`);
     return [];
   }
 }
