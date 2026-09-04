@@ -1086,8 +1086,16 @@ async function inspectRaiCandidate(candidate) {
     }, 8000);
     const manifest = String(data.video && data.video[0] || '');
     const parsed = new URL(manifest);
+    // RAI's relinker returns HTTP 200 with this exact placeholder file - not an
+    // error - when the requested content needs a RaiPlay login it doesn't have
+    // (increasingly the default across their catalog, old and new content alike).
+    // The placeholder lives on a legitimate akamaized.net host, so without this
+    // check it would pass the domain test below and get reported as playable.
+    const isUnavailablePlaceholder = /\/video_no_available\.mp4$/i.test(parsed.pathname)
+      || data.description === 'video non disponibile';
     if (
-      parsed.protocol !== 'https:'
+      isUnavailablePlaceholder
+      || parsed.protocol !== 'https:'
       || !(
         parsed.hostname.endsWith('.rai.it')
         || parsed.hostname.endsWith('.akamaized.net')

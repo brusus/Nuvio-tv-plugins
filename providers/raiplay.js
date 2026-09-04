@@ -1201,7 +1201,8 @@ var require_official_vod = __commonJS({
           }, 8e3);
           const manifest = String(data.video && data.video[0] || "");
           const parsed = new URL(manifest);
-          if (parsed.protocol !== "https:" || !(parsed.hostname.endsWith(".rai.it") || parsed.hostname.endsWith(".akamaized.net") || parsed.hostname.endsWith(".msvdn.net"))) {
+          const isUnavailablePlaceholder = /\/video_no_available\.mp4$/i.test(parsed.pathname) || data.description === "video non disponibile";
+          if (isUnavailablePlaceholder || parsed.protocol !== "https:" || !(parsed.hostname.endsWith(".rai.it") || parsed.hostname.endsWith(".akamaized.net") || parsed.hostname.endsWith(".msvdn.net"))) {
             return cacheSet(cacheKey, { available: false, quality: "720p" }, 30 * 1e3);
           }
           const quality = yield detectManifestQuality(manifest, {
