@@ -198,6 +198,8 @@ var require_official_vod = __commonJS({
     var RAI_ORIGIN = "https://www.raiplay.it";
     var RAI_SEARCH_URL = `${RAI_ORIGIN}/atomatic/raiplay-search-service/api/v1/msearch`;
     var RAI_RELINKER = "https://mediapolisvod.rai.it/relinker/relinkerServlet.htm";
+    var RAI_AUTH_URL = `${RAI_ORIGIN}/raisso/login/domain/app/social`;
+    var RAI_DOMAIN_API_KEY = "arSgRtwasD324SaA";
     var MEDIASET_GRAPHQL = "https://mediasetplay.api-graph.mediaset.it/";
     var MEDIASET_FEED = "https://feed.entertainment.tv.theplatform.eu/f/PR1GhC";
     var MEDIASET_LOGIN = "https://api-ott-prod-fe.mediaset.net/PROD/play/idm/anonymous/login/v2.0";
@@ -207,6 +209,52 @@ var require_official_vod = __commonJS({
     function debug(message, error) {
       if (!DEBUG) return;
       console.warn(`[OfficialVOD] ${message}${error ? `: ${error.message || error}` : ""}`);
+    }
+    function getSetting(settingName, envName) {
+      try {
+        const settings = typeof globalThis !== "undefined" && globalThis.SCRAPER_SETTINGS || {};
+        const fromApp = settings[settingName];
+        const fromEnv = typeof process !== "undefined" && process.env && process.env[envName] || "";
+        return String(fromApp || fromEnv || "").trim();
+      } catch (_) {
+        return "";
+      }
+    }
+    function getRaiAccountEmail() {
+      return getSetting("email", "RAIPLAY_ACCOUNT_EMAIL");
+    }
+    function getRaiAccountPassword() {
+      return getSetting("password", "RAIPLAY_ACCOUNT_PASSWORD");
+    }
+    function getRaiAuthToken() {
+      return __async(this, null, function* () {
+        const email = getRaiAccountEmail();
+        const password = getRaiAccountPassword();
+        if (!email || !password) return null;
+        const cacheKey = `rai-auth-token:${email}`;
+        const cached = cacheGet(cacheKey);
+        if (cached) return cached;
+        try {
+          const body = new URLSearchParams({ email, password, domainApiKey: RAI_DOMAIN_API_KEY });
+          const data = yield fetchJson(RAI_AUTH_URL, {
+            method: "POST",
+            headers: {
+              "content-type": "application/x-www-form-urlencoded",
+              origin: RAI_ORIGIN,
+              referer: `${RAI_ORIGIN}/`
+            },
+            body: body.toString()
+          }, 1e4);
+          if (data.response !== "OK" || !data.ua) {
+            debug(`RaiPlay login failed: ${data.message || data.detail || "unknown error"}`);
+            return null;
+          }
+          return cacheSet(cacheKey, data.ua, 45 * 60 * 1e3);
+        } catch (error) {
+          debug("RaiPlay login request failed", error);
+          return null;
+        }
+      });
     }
     function cacheGet(key) {
       const item = CACHE.get(key);
@@ -1193,11 +1241,15 @@ var require_official_vod = __commonJS({
         const cached = cacheGet(cacheKey);
         if (cached) return cached;
         try {
+          const authToken = yield getRaiAuthToken();
           const relinker = new URL(RAI_RELINKER);
           relinker.searchParams.set("cont", candidate.contentId);
           relinker.searchParams.set("output", "62");
           const data = yield fetchJson(relinker, {
-            headers: { origin: RAI_ORIGIN, referer: `${RAI_ORIGIN}/` }
+            headers: __spreadValues({
+              origin: RAI_ORIGIN,
+              referer: `${RAI_ORIGIN}/`
+            }, authToken ? { "x-ua-token": authToken } : {})
           }, 8e3);
           const manifest = String(data.video && data.video[0] || "");
           const parsed = new URL(manifest);
@@ -1205,11 +1257,11 @@ var require_official_vod = __commonJS({
           if (isUnavailablePlaceholder || parsed.protocol !== "https:" || !(parsed.hostname.endsWith(".rai.it") || parsed.hostname.endsWith(".akamaized.net") || parsed.hostname.endsWith(".msvdn.net"))) {
             return cacheSet(cacheKey, { available: false, quality: "720p" }, 30 * 1e3);
           }
-          const quality = yield detectManifestQuality(manifest, {
+          const quality = yield detectManifestQuality(manifest, __spreadValues({
             origin: RAI_ORIGIN,
             referer: `${RAI_ORIGIN}/`,
             "user-agent": USER_AGENT
-          });
+          }, authToken ? { "x-ua-token": authToken } : {}));
           return cacheSet(cacheKey, { available: true, quality, manifestUrl: manifest }, 15 * 60 * 1e3);
         } catch (error) {
           debug(`RaiPlay lightweight inspection failed for ${candidate.contentId}`, error);
@@ -1287,6 +1339,7 @@ var require_official_vod = __commonJS({
               const episode2 = candidate.episode != null ? candidate.episode : target.episode;
               const title = target.type === "series" ? season2 != null && episode2 != null ? `${siteSeriesTitle} S${String(season2).padStart(2, "0")}E${String(episode2).padStart(2, "0")}` : siteSeriesTitle : siteMovieTitle;
               const streamUrl = usingProxy ? buildLazyExtractorUrl(candidate, proxyEntries[0]) : inspection.manifestUrl;
+              const directAuthToken = usingProxy ? null : yield getRaiAuthToken();
               const stream = formatStream({
                 url: streamUrl,
                 name: label,
@@ -1295,11 +1348,11 @@ var require_official_vod = __commonJS({
                 language: "Italian",
                 type: "direct",
                 subtitles: candidate.subtitles || [],
-                headers: usingProxy ? void 0 : {
+                headers: usingProxy ? void 0 : __spreadValues({
                   origin: RAI_ORIGIN,
                   referer: `${RAI_ORIGIN}/`,
                   "user-agent": USER_AGENT
-                },
+                }, directAuthToken ? { "x-ua-token": directAuthToken } : {}),
                 behaviorHints: {
                   notWebReady: true,
                   bingeGroup: provider === "raiplay" ? "raiplay" : "mediaset",

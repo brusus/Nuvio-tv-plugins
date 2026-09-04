@@ -6,6 +6,16 @@ const MEDIASET_ORIGIN = 'https://mediasetinfinity.mediaset.it';
 const RAI_ORIGIN = 'https://www.raiplay.it';
 const RAI_SEARCH_URL = `${RAI_ORIGIN}/atomatic/raiplay-search-service/api/v1/msearch`;
 const RAI_RELINKER = 'https://mediapolisvod.rai.it/relinker/relinkerServlet.htm';
+// RAI now requires a (free) RaiPlay account session for essentially all
+// playback - anonymous relinker calls return a fixed "video not available"
+// placeholder regardless of title or geography. Endpoint and domainApiKey
+// match the widely-used, actively-maintained streamlink RaiPlay plugin
+// (github.com/streamlink/streamlink, src/streamlink/plugins/raiplay.py) -
+// verified live: a wrong-password attempt against this endpoint returns a
+// proper "Combinazione email/password errata" error, not a malformed-request
+// error, confirming the endpoint/key/body shape are correct.
+const RAI_AUTH_URL = `${RAI_ORIGIN}/raisso/login/domain/app/social`;
+const RAI_DOMAIN_API_KEY = 'arSgRtwasD324SaA';
 const MEDIASET_GRAPHQL = 'https://mediasetplay.api-graph.mediaset.it/';
 const MEDIASET_FEED = 'https://feed.entertainment.tv.theplatform.eu/f/PR1GhC';
 const MEDIASET_LOGIN = 'https://api-ott-prod-fe.mediaset.net/PROD/play/idm/anonymous/login/v2.0';
@@ -16,6 +26,63 @@ const DEBUG = typeof process !== 'undefined' && process.env && process.env.OFFIC
 function debug(message, error) {
   if (!DEBUG) return;
   console.warn(`[OfficialVOD] ${message}${error ? `: ${error.message || error}` : ''}`);
+}
+
+// Settings provided by the app at runtime (globalThis.SCRAPER_SETTINGS) or,
+// when running server-side, an environment variable. No fallback is written
+// into the code: this file is public on GitHub and any committed credential
+// would be readable by anyone.
+function getSetting(settingName, envName) {
+  try {
+    const settings = (typeof globalThis !== 'undefined' && globalThis.SCRAPER_SETTINGS) || {};
+    const fromApp = settings[settingName];
+    const fromEnv = (typeof process !== 'undefined' && process.env && process.env[envName]) || '';
+    return String(fromApp || fromEnv || '').trim();
+  } catch (_) {
+    return '';
+  }
+}
+
+function getRaiAccountEmail() {
+  return getSetting('email', 'RAIPLAY_ACCOUNT_EMAIL');
+}
+function getRaiAccountPassword() {
+  return getSetting('password', 'RAIPLAY_ACCOUNT_PASSWORD');
+}
+
+// Returns a valid x-ua-token, or null when no RaiPlay account is configured
+// or the login attempt failed. Cached for the token's own JWT lifetime so we
+// don't log in again on every scrape.
+async function getRaiAuthToken() {
+  const email = getRaiAccountEmail();
+  const password = getRaiAccountPassword();
+  if (!email || !password) return null;
+  const cacheKey = `rai-auth-token:${email}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) return cached;
+  try {
+    const body = new URLSearchParams({ email, password, domainApiKey: RAI_DOMAIN_API_KEY });
+    const data = await fetchJson(RAI_AUTH_URL, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        origin: RAI_ORIGIN,
+        referer: `${RAI_ORIGIN}/`
+      },
+      body: body.toString()
+    }, 10000);
+    if (data.response !== 'OK' || !data.ua) {
+      debug(`RaiPlay login failed: ${data.message || data.detail || 'unknown error'}`);
+      return null;
+    }
+    // The authorization field is a JWT whose payload carries the real
+    // expiry, but base64 decoding (atob/Buffer) isn't reliably available in
+    // this sandbox. A conservative fixed TTL avoids depending on either.
+    return cacheSet(cacheKey, data.ua, 45 * 60 * 1000);
+  } catch (error) {
+    debug('RaiPlay login request failed', error);
+    return null;
+  }
 }
 
 function cacheGet(key) {
@@ -1078,11 +1145,16 @@ async function inspectRaiCandidate(candidate) {
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
   try {
+    const authToken = await getRaiAuthToken();
     const relinker = new URL(RAI_RELINKER);
     relinker.searchParams.set('cont', candidate.contentId);
     relinker.searchParams.set('output', '62');
     const data = await fetchJson(relinker, {
-      headers: { origin: RAI_ORIGIN, referer: `${RAI_ORIGIN}/` }
+      headers: {
+        origin: RAI_ORIGIN,
+        referer: `${RAI_ORIGIN}/`,
+        ...(authToken ? { 'x-ua-token': authToken } : {})
+      }
     }, 8000);
     const manifest = String(data.video && data.video[0] || '');
     const parsed = new URL(manifest);
@@ -1107,7 +1179,8 @@ async function inspectRaiCandidate(candidate) {
     const quality = await detectManifestQuality(manifest, {
       origin: RAI_ORIGIN,
       referer: `${RAI_ORIGIN}/`,
-      'user-agent': USER_AGENT
+      'user-agent': USER_AGENT,
+      ...(authToken ? { 'x-ua-token': authToken } : {})
     });
     return cacheSet(cacheKey, { available: true, quality, manifestUrl: manifest }, 15 * 60 * 1000);
   } catch (error) {
@@ -1235,6 +1308,7 @@ async function getOfficialStreams(provider, id, type, season, episode, context =
         const streamUrl = usingProxy
           ? buildLazyExtractorUrl(candidate, proxyEntries[0])
           : inspection.manifestUrl;
+        const directAuthToken = usingProxy ? null : await getRaiAuthToken();
         const stream = formatStream({
           url: streamUrl,
           name: label,
@@ -1246,7 +1320,8 @@ async function getOfficialStreams(provider, id, type, season, episode, context =
           headers: usingProxy ? undefined : {
             origin: RAI_ORIGIN,
             referer: `${RAI_ORIGIN}/`,
-            'user-agent': USER_AGENT
+            'user-agent': USER_AGENT,
+            ...(directAuthToken ? { 'x-ua-token': directAuthToken } : {})
           },
           behaviorHints: {
             notWebReady: true,
