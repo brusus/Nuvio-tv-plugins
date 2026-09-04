@@ -1,6 +1,6 @@
 {
   "name": "Nuvio tv plugins",
-  "version": "1.3.47",
+  "version": "1.3.48",
   "scrapers": [
     {
       "id": "easystreams-pcc",
