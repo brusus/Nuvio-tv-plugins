@@ -1097,9 +1097,13 @@ async function inspectRaiCandidate(candidate) {
       referer: `${RAI_ORIGIN}/`,
       'user-agent': USER_AGENT
     });
-    return cacheSet(cacheKey, { available: true, quality }, 15 * 60 * 1000);
+    return cacheSet(cacheKey, { available: true, quality, manifestUrl: manifest }, 15 * 60 * 1000);
   } catch (error) {
     debug(`RaiPlay lightweight inspection failed for ${candidate.contentId}`, error);
+    // No manifestUrl here: the proxy path re-resolves independently at playback
+    // time so this used to be harmless, but the direct (no-proxy) path has
+    // nothing to stream without it - callers must treat a missing manifestUrl
+    // as unavailable when there's no proxy to fall back on.
     return { available: true, quality: '720p' };
   }
 }
@@ -1131,7 +1135,13 @@ function providerLabel(candidate) {
 async function getOfficialStreams(provider, id, type, season, episode, context = {}) {
   try {
     const proxyEntries = resolveProxyEntries(context || {});
-    if (!proxyEntries.length) return [];
+    // Mediaset genuinely needs EasyProxy: playback/rights checks from the addon's
+    // own IP return false PL053 errors (see comment below) and DRM/WARP handling
+    // is delegated to it. RaiPlay has no such dependency - inspectRaiCandidate
+    // already resolves the real manifest URL directly from RAI's relinker, so
+    // without a proxy we just serve that manifest straight to the player instead
+    // of bailing out entirely.
+    if (!proxyEntries.length && provider !== 'raiplay') return [];
     const target = await resolveTarget(id, type, season, episode, context || {});
     if (!target) return [];
     const all = [];
@@ -1193,6 +1203,10 @@ async function getOfficialStreams(provider, id, type, season, episode, context =
           ? await inspectRaiCandidate(candidate)
           : { available: true, quality: '720p' };
         if (!inspection.available) continue;
+        const usingProxy = Boolean(proxyEntries.length);
+        // Direct RaiPlay path (no proxy configured): we can only stream what
+        // inspectRaiCandidate actually managed to resolve itself.
+        if (provider === 'raiplay' && !usingProxy && !inspection.manifestUrl) continue;
         const label = providerLabel(candidate);
         const siteSeriesTitle = cleanTitle(decodeHtml(candidate.seriesTitle || candidate.title || target.title));
         const siteMovieTitle = cleanTitle(decodeHtml(candidate.title || candidate.seriesTitle || target.title));
@@ -1203,14 +1217,22 @@ async function getOfficialStreams(provider, id, type, season, episode, context =
               ? `${siteSeriesTitle} S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`
               : siteSeriesTitle)
           : siteMovieTitle;
+        const streamUrl = usingProxy
+          ? buildLazyExtractorUrl(candidate, proxyEntries[0])
+          : inspection.manifestUrl;
         const stream = formatStream({
-          url: buildLazyExtractorUrl(candidate, proxyEntries[0]),
+          url: streamUrl,
           name: label,
           title,
           quality: inspection.quality,
           language: 'Italian',
           type: 'direct',
           subtitles: candidate.subtitles || [],
+          headers: usingProxy ? undefined : {
+            origin: RAI_ORIGIN,
+            referer: `${RAI_ORIGIN}/`,
+            'user-agent': USER_AGENT
+          },
           behaviorHints: {
             notWebReady: true,
             bingeGroup: provider === 'raiplay' ? 'raiplay' : 'mediaset',

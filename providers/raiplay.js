@@ -1208,7 +1208,7 @@ var require_official_vod = __commonJS({
             referer: `${RAI_ORIGIN}/`,
             "user-agent": USER_AGENT
           });
-          return cacheSet(cacheKey, { available: true, quality }, 15 * 60 * 1e3);
+          return cacheSet(cacheKey, { available: true, quality, manifestUrl: manifest }, 15 * 60 * 1e3);
         } catch (error) {
           debug(`RaiPlay lightweight inspection failed for ${candidate.contentId}`, error);
           return { available: true, quality: "720p" };
@@ -1245,7 +1245,7 @@ var require_official_vod = __commonJS({
       return __async(this, arguments, function* (provider, id, type, season, episode, context = {}) {
         try {
           const proxyEntries = resolveProxyEntries(context || {});
-          if (!proxyEntries.length) return [];
+          if (!proxyEntries.length && provider !== "raiplay") return [];
           const target = yield resolveTarget(id, type, season, episode, context || {});
           if (!target) return [];
           const all = [];
@@ -1273,20 +1273,28 @@ var require_official_vod = __commonJS({
             try {
               const inspection = provider === "raiplay" ? yield inspectRaiCandidate(candidate) : { available: true, quality: "720p" };
               if (!inspection.available) continue;
+              const usingProxy = Boolean(proxyEntries.length);
+              if (provider === "raiplay" && !usingProxy && !inspection.manifestUrl) continue;
               const label = providerLabel(candidate);
               const siteSeriesTitle = cleanTitle(decodeHtml(candidate.seriesTitle || candidate.title || target.title));
               const siteMovieTitle = cleanTitle(decodeHtml(candidate.title || candidate.seriesTitle || target.title));
               const season2 = candidate.season != null ? candidate.season : target.season;
               const episode2 = candidate.episode != null ? candidate.episode : target.episode;
               const title = target.type === "series" ? season2 != null && episode2 != null ? `${siteSeriesTitle} S${String(season2).padStart(2, "0")}E${String(episode2).padStart(2, "0")}` : siteSeriesTitle : siteMovieTitle;
+              const streamUrl = usingProxy ? buildLazyExtractorUrl(candidate, proxyEntries[0]) : inspection.manifestUrl;
               const stream = formatStream({
-                url: buildLazyExtractorUrl(candidate, proxyEntries[0]),
+                url: streamUrl,
                 name: label,
                 title,
                 quality: inspection.quality,
                 language: "Italian",
                 type: "direct",
                 subtitles: candidate.subtitles || [],
+                headers: usingProxy ? void 0 : {
+                  origin: RAI_ORIGIN,
+                  referer: `${RAI_ORIGIN}/`,
+                  "user-agent": USER_AGENT
+                },
                 behaviorHints: {
                   notWebReady: true,
                   bingeGroup: provider === "raiplay" ? "raiplay" : "mediaset",
