@@ -1,6 +1,6 @@
 {
   "name": "Nuvio tv plugins",
-  "version": "1.3.49",
+  "version": "1.3.48",
   "scrapers": [
     {
       "id": "easystreams-pcc",
@@ -341,29 +341,6 @@
         "raitv:"
       ],
       "filename": "providers/raiplay-live.js",
-      "supportedTypes": [
-        "tv"
-      ],
-      "enabled": true
-    },
-    {
-      "id": "official-mediaset-live",
-      "name": "Mediaset Infinity Live TV",
-      "version": "1.0.0",
-      "description": "Live Mediaset TV channels (Canale 5, Italia 1, Rete 4, ...), played through Mediaset's own web player inside the app. Requires a free Mediaset Infinity account (Login button).",
-      "resources": [
-        "stream"
-      ],
-      "contentLanguage": [
-        "it"
-      ],
-      "formats": [
-        "m3u8"
-      ],
-      "idPrefixes": [
-        "mediasettv:"
-      ],
-      "filename": "providers/mediaset-live.js",
       "supportedTypes": [
         "tv"
       ],
