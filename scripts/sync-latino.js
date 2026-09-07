@@ -12,6 +12,10 @@
 // Latino non passano da esbuild) e non committa: quello lo fa il workflow,
 // solo se questo script ha prodotto modifiche.
 //
+// Vive in manifest-latino.json, separato da manifest.json (solo italiano):
+// cosi' in Nuvio i due gruppi si possono aggiungere/rimuovere come repo
+// indipendenti, invece di abilitare/disabilitare 10 provider alla volta.
+//
 // Non rimuove mai un provider sparito dall'upstream: lo segnala soltanto,
 // cosi' una rimozione va sempre confermata a mano.
 
@@ -23,7 +27,7 @@ const UPSTREAM_PROVIDERS_BASE = 'https://raw.githubusercontent.com/KennethJYS/Nu
 
 const ROOT = path.join(__dirname, '..');
 const LATINO_DIR = path.join(ROOT, 'providers', 'latino');
-const MANIFEST = path.join(ROOT, 'manifest.json');
+const MANIFEST = path.join(ROOT, 'manifest-latino.json');
 const SUMMARY_FILE = path.join(ROOT, '.heal-summary.txt');
 
 function bumpOurEntry(manifest, id, upsertFields) {

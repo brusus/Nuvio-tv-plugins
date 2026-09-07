@@ -6,13 +6,21 @@ I plugin girano direttamente nell'app (sul dispositivo) — non serve nessun ser
 
 ## Installazione
 
-In Nuvio → sezione **Plugin** → aggiungi repo, incolla questo URL:
+I provider italiani e quelli spagnoli sono **due manifest separati**, cosi' si possono aggiungere/rimuovere in Nuvio come due repo indipendenti invece di abilitare/disabilitare 10 provider alla volta.
+
+In Nuvio → sezione **Plugin** → aggiungi repo, incolla uno o entrambi:
 
 ```
+# Provider italiani
 https://raw.githubusercontent.com/brusus/Nuvio-tv-plugins/refs/heads/main/manifest.json
+
+# Provider Latino (spagnolo)
+https://raw.githubusercontent.com/brusus/Nuvio-tv-plugins/refs/heads/main/manifest-latino.json
 ```
 
-Poi abilita i provider che vuoi usare. Se compare "nessun plugin installato" nonostante l'URL sia giusto, rimuovi e ri-aggiungi il repo (Nuvio a volte tiene in cache un caricamento fallito).
+Per vedere solo una lingua alla volta, rimuovi l'altro repo dalla lista — non serve toccare i singoli provider.
+
+Se compare "nessun plugin installato" nonostante l'URL sia giusto, rimuovi e ri-aggiungi il repo (Nuvio a volte tiene in cache un caricamento fallito).
 
 ## Provider inclusi
 
@@ -44,7 +52,7 @@ Poi abilita i provider che vuoi usare. Se compare "nessun plugin installato" non
 | **LaMovie** | Film e serie | movie, tv |
 | **HackStore** | Film e serie | movie, tv |
 
-Questi 10 provider sono bundle pre-compilati vendorizzati da [KennethJYS/Nuvio-Providers-Latino](https://github.com/KennethJYS/Nuvio-Providers-Latino) (nessuna licenza dichiarata dall'autore originale — crediti completi a lui). Vivono in `providers/latino/`, separati dai provider italiani: non hanno sorgente in `src/` in questo repo, non partecipano all'auto-guarigione domini, e vanno aggiornati manualmente ri-scaricando dal repo originale se l'autore rilascia una versione piu' recente.
+Questi 10 provider sono bundle pre-compilati vendorizzati da [KennethJYS/Nuvio-Providers-Latino](https://github.com/KennethJYS/Nuvio-Providers-Latino) (nessuna licenza dichiarata dall'autore originale — crediti completi a lui). Vivono in `providers/latino/` con un manifest proprio (`manifest-latino.json`), separati dai provider italiani: non hanno sorgente in `src/` in questo repo, e invece dell'auto-guarigione dei domini si sincronizzano con l'upstream (vedi sotto).
 
 ## StreamingCommunity — login premium (1080p)
 
@@ -54,7 +62,10 @@ Le credenziali **non** sono scritte nel codice (questo repo è pubblico): vengon
 
 ## Auto-guarigione dei domini
 
-Questi siti cambiano dominio spesso. Un workflow GitHub Actions (`Heal Domains`) gira **ogni ora**: segue i redirect, e se un sito si è spostato aggiorna il dominio nel codice, ricompila i bundle e committa da solo — solo se il nuovo dominio risponde correttamente e il build riesce. In più ogni provider si auto-cura anche a runtime seguendo il redirect.
+Questi siti cambiano dominio spesso. Un workflow GitHub Actions (`Heal Domains`) gira **ogni ora** e fa due cose:
+
+- **Provider italiani**: segue i redirect, e se un sito si è spostato aggiorna il dominio nel codice, ricompila i bundle e committa da solo — solo se il nuovo dominio risponde correttamente e il build riesce. In più ogni provider si auto-cura anche a runtime seguendo il redirect.
+- **Provider Latino**: confronta ogni bundle con la versione live sul repo di KennethJYS e, se diversa, la scarica (dominio cambiato, fix, o provider nuovo). Non rimuove mai un provider sparito dall'upstream, solo lo segnala.
 
 ## Note e limiti
 
