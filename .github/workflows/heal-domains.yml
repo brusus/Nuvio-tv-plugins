@@ -1,7 +1,9 @@
 name: Heal Domains
 
 # Controlla se i siti dei provider hanno cambiato dominio (redirect) e, in caso,
-# aggiorna il sorgente, ricompila i bundle e committa. Gira ogni ora e a mano.
+# aggiorna il sorgente, ricompila i bundle e committa. Sincronizza anche i
+# provider Latino (providers/latino/) con l'upstream di KennethJYS, dato che
+# per quelli non abbiamo sorgente da riscrivere. Gira ogni ora e a mano.
 
 on:
   schedule:
@@ -33,6 +35,9 @@ jobs:
       - name: Rileva e applica i domini spostati
         run: node scripts/heal-domains.js
 
+      - name: Sincronizza i provider Latino con l'upstream
+        run: node scripts/sync-latino.js
+
       - name: Ricompila e committa se qualcosa e' cambiato
         run: |
           if [ -z "$(git status --porcelain)" ]; then
@@ -47,5 +52,5 @@ jobs:
           SUMMARY=$(cat .heal-summary.txt 2>/dev/null || echo "domini aggiornati")
           rm -f .heal-summary.txt
           git add -A
-          git commit -m "Heal domains: aggiorna i domini spostati" -m "$SUMMARY"
+          git commit -m "Heal domains: aggiorna domini e provider Latino" -m "$SUMMARY"
           git push
