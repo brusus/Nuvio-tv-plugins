@@ -194,7 +194,7 @@
     {
       "id": "easystreams-altadefinizionestreaming",
       "name": "AltadefinizioneStreaming",
-      "version": "1.0.11",
+      "version": "1.0.12",
       "description": "Movies and Series from AltadefinizioneStreaming",
       "resources": [
         "stream"

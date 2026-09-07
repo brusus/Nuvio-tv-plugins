@@ -1,5 +1,5 @@
 const TMDB_API_KEY = "68e094699525b18a70bab2f86b1fa706";
-let BASE_URL = "https://altadefinizionestreaming.tv";
+let BASE_URL = "https://altadefinizionestreaming.info";
 const USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36";
 const CDN_PROBE_TIMEOUT_MS = 500;
 
@@ -117,7 +117,7 @@ async function addCdnStream(streams, tmdbId, type, season, episode, displayName,
 }
 
 async function getStreams(id, type, season, episode, providerContext = null) {
-  BASE_URL = await resolveLiveDomain("https://altadefinizionestreaming.tv");
+  BASE_URL = await resolveLiveDomain("https://altadefinizionestreaming.info");
   const normalizedType = String(type || "").toLowerCase();
   if (normalizedType !== "movie" && normalizedType !== "tv" && normalizedType !== "series") return [];
 
