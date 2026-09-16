@@ -27,7 +27,7 @@ if (!IS_SERVER) {
 } else {
 const { webcrypto, createHash } = require('crypto');
 
-let BASE_URL = 'https://cinejoy.to';
+let BASE_URL = 'https://cinejoy.pk';
 const API_URL = 'https://api.shegu.st';
 const WASM_URL = `${API_URL}/crush.wasm`;
 const TMDB_API_KEY = '68e094699525b18a70bab2f86b1fa706';
@@ -561,7 +561,7 @@ async function getServerStreams(
 }
 
 async function getStreams(id, type, season, episode, providerContext = null) {
-  BASE_URL = await resolveLiveDomain("https://cinejoy.to");
+  BASE_URL = await resolveLiveDomain("https://cinejoy.pk");
   setDiagnostics('start', { id: String(id || ''), type: String(type || '') });
   const normalizedType = String(type || '').toLowerCase();
   if (!['movie', 'tv', 'series'].includes(normalizedType)) return [];

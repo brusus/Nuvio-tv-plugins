@@ -13224,7 +13224,7 @@ var require_vidxgo2 = __commonJS({
 var require_altadefinizionestreaming = __commonJS({
   "src/altadefinizionestreaming/index.js"(exports2, module2) {
     var TMDB_API_KEY2 = "68e094699525b18a70bab2f86b1fa706";
-    var BASE_URL = "https://altadefinizionestreaming.info";
+    var BASE_URL = "https://altadefinizionestreaming.org";
     var USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36";
     var CDN_PROBE_TIMEOUT_MS = 500;
     var SESSION_COOKIE = "sid=32234dfabd14e587764e84405e75e99856c6bef31c6b1752e19897b8ae3d4a21";
@@ -13332,7 +13332,7 @@ var require_altadefinizionestreaming = __commonJS({
     }
     function getStreams2(id, type, season, episode, providerContext = null) {
       return __async(this, null, function* () {
-        BASE_URL = yield resolveLiveDomain("https://altadefinizionestreaming.info");
+        BASE_URL = yield resolveLiveDomain("https://altadefinizionestreaming.org");
         const normalizedType = String(type || "").toLowerCase();
         if (normalizedType !== "movie" && normalizedType !== "tv" && normalizedType !== "series") return [];
         const cookie = getCookie();
@@ -14437,7 +14437,7 @@ var require_cinejoy = __commonJS({
       };
       setDiagnostics = setDiagnostics2, getDiagnostics = getDiagnostics2, fetchWithTimeout = fetchWithTimeout2, resolveTmdbId = resolveTmdbId2, getTitleHint = getTitleHint2, parseHlsAttributes = parseHlsAttributes2, normalizeQuality = normalizeQuality2, resolvePlaylistUrl = resolvePlaylistUrl2, inspectHlsMaster = inspectHlsMaster2, encodeBase64Url = encodeBase64Url2, buildVixsrcAudioUrl = buildVixsrcAudioUrl2, buildDualFallbackUrl = buildDualFallbackUrl2, getMediaRequest = getMediaRequest2, buildDualMediaKey = buildDualMediaKey2, buildDualVideoFingerprint = buildDualVideoFingerprint2;
       const { webcrypto, createHash } = require("crypto");
-      let BASE_URL = "https://cinejoy.to";
+      let BASE_URL = "https://cinejoy.pk";
       const API_URL = "https://api.shegu.st";
       const WASM_URL = `${API_URL}/crush.wasm`;
       const TMDB_API_KEY2 = "68e094699525b18a70bab2f86b1fa706";
@@ -14733,7 +14733,7 @@ var require_cinejoy = __commonJS({
       }
       function getStreams2(id, type, season, episode, providerContext = null) {
         return __async(this, null, function* () {
-          BASE_URL = yield resolveLiveDomain("https://cinejoy.to");
+          BASE_URL = yield resolveLiveDomain("https://cinejoy.pk");
           setDiagnostics2("start", { id: String(id || ""), type: String(type || "") });
           const normalizedType = String(type || "").toLowerCase();
           if (!["movie", "tv", "series"].includes(normalizedType)) return [];

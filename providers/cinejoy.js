@@ -530,7 +530,7 @@ if (!IS_SERVER) {
   };
   setDiagnostics2 = setDiagnostics, getDiagnostics2 = getDiagnostics, fetchWithTimeout2 = fetchWithTimeout, resolveTmdbId2 = resolveTmdbId, getTitleHint2 = getTitleHint, parseHlsAttributes2 = parseHlsAttributes, normalizeQuality2 = normalizeQuality, resolvePlaylistUrl2 = resolvePlaylistUrl, inspectHlsMaster2 = inspectHlsMaster, encodeBase64Url2 = encodeBase64Url, buildVixsrcAudioUrl2 = buildVixsrcAudioUrl, buildDualFallbackUrl2 = buildDualFallbackUrl, getMediaRequest2 = getMediaRequest, buildDualMediaKey2 = buildDualMediaKey, buildDualVideoFingerprint2 = buildDualVideoFingerprint;
   const { webcrypto, createHash } = require("crypto");
-  let BASE_URL = "https://cinejoy.to";
+  let BASE_URL = "https://cinejoy.pk";
   const API_URL = "https://api.shegu.st";
   const WASM_URL = `${API_URL}/crush.wasm`;
   const TMDB_API_KEY = "68e094699525b18a70bab2f86b1fa706";
@@ -826,7 +826,7 @@ if (!IS_SERVER) {
   }
   function getStreams(id, type, season, episode, providerContext = null) {
     return __async(this, null, function* () {
-      BASE_URL = yield resolveLiveDomain("https://cinejoy.to");
+      BASE_URL = yield resolveLiveDomain("https://cinejoy.pk");
       setDiagnostics("start", { id: String(id || ""), type: String(type || "") });
       const normalizedType = String(type || "").toLowerCase();
       if (!["movie", "tv", "series"].includes(normalizedType)) return [];

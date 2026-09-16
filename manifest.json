@@ -194,7 +194,7 @@
     {
       "id": "easystreams-altadefinizionestreaming",
       "name": "AltadefinizioneStreaming",
-      "version": "1.0.12",
+      "version": "1.0.13",
       "description": "Movies and Series from AltadefinizioneStreaming",
       "resources": [
         "stream"
@@ -249,7 +249,7 @@
     {
       "id": "easystreams-cinejoy",
       "name": "Cinejoy",
-      "version": "1.0.4",
+      "version": "1.0.5",
       "description": "Movies and Series from Cinejoy (server resolver)",
       "resources": [
         "stream"
