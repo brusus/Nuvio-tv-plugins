@@ -7647,21 +7647,21 @@ var require_guardoserie = __commonJS({
     var { formatStream } = require_formatter();
     var { checkQualityFromPlaylist } = require_quality_helper();
     var IS_SERVER = typeof process !== "undefined" && process.versions && process.versions.node;
-    if (!IS_SERVER) {
-      module2.exports = {
-        getStreams: (id, type, season, episode) => __async(null, null, function* () {
-          try {
-            const url = `https://easystreams.realbestia.com/resolve/guardoserie?id=${id}&type=${type}&s=${season || 1}&ep=${episode || 1}`;
-            const response = yield fetch(url);
-            const data = yield response.json();
-            return data.streams || [];
-          } catch (e) {
-            console.error("[Guardoserie-Client] API Error:", e.message);
-            return [];
-          }
-        })
-      };
-    } else {
+    function remoteResolve(id, type, season, episode) {
+      return __async(this, null, function* () {
+        try {
+          const remoteType = type === "tv" || type === "show" ? "series" : type;
+          const url = `https://easystreams.realbestia.com/resolve/guardoserie?id=${id}&type=${remoteType}&s=${season || 1}&ep=${episode || 1}`;
+          const response = yield fetch(url);
+          const data = yield response.json();
+          return data && data.streams || [];
+        } catch (e) {
+          console.error("[Guardoserie-Client] API Error:", e.message);
+          return [];
+        }
+      });
+    }
+    {
       let getGuardoserieBaseUrl2 = function() {
         return guardoserieBaseUrl;
       }, getMappingApiUrl2 = function() {
@@ -7854,7 +7854,7 @@ var require_guardoserie = __commonJS({
       const { hasActiveBypass } = require_cf_bypass();
       const { USER_AGENT, getProxiedUrl } = require_common();
       const { extractLoadm } = require_loadm();
-      const STEP_BENCH_ENABLED = String(process.env.PROVIDER_STEP_BENCH || "").trim().toLowerCase() === "1";
+      const STEP_BENCH_ENABLED = String(IS_SERVER && process.env.PROVIDER_STEP_BENCH || "").trim().toLowerCase() === "1";
       const GUARDOSERIE_SEARCH_TIMEOUT_MS = 2e3;
       const GUARDOSERIE_CONFIG_URL = "https://raw.githubusercontent.com/realbestia1/domains/refs/heads/main/domains.json";
       let guardoserieBaseUrl = null;
@@ -8302,7 +8302,22 @@ var require_guardoserie = __commonJS({
           return nestedStreams.flat().filter(Boolean);
         });
       }
-      module2.exports = { getStreams: getStreams2 };
+      if (IS_SERVER) {
+        module2.exports = { getStreams: getStreams2 };
+      } else {
+        module2.exports = {
+          getStreams: (id, type, season, episode) => __async(null, null, function* () {
+            let local = [];
+            try {
+              local = (yield getStreams2(id, type, season, episode)) || [];
+            } catch (e) {
+              console.error("[Guardoserie-Client] Local scrape error:", e.message);
+            }
+            if (local.length > 0) return local;
+            return remoteResolve(id, type, season, episode);
+          })
+        };
+      }
     }
     var getGuardoserieBaseUrl;
     var getMappingApiUrl;

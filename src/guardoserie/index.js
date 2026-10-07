@@ -4,30 +4,31 @@ const { checkQualityFromPlaylist } = require('../quality_helper');
 // Rilevamento ambiente: Server (Node) o Client (Nuvio/React Native)
 const IS_SERVER = typeof process !== 'undefined' && process.versions && process.versions.node;
 
-if (!IS_SERVER) {
-    // SIAMO SU NUVIO: usiamo l'API remota del server per evitare crash e blocchi CF
-    module.exports = {
-        getStreams: async (id, type, season, episode) => {
-            try {
-                const url = `https://easystreams.realbestia.com/resolve/guardoserie?id=${id}&type=${type}&s=${season || 1}&ep=${episode || 1}`;
-                const response = await fetch(url);
-                const data = await response.json();
-                return data.streams || [];
-            } catch (e) {
-                console.error('[Guardoserie-Client] API Error:', e.message);
-                return [];
-            }
-        }
-    };
-    // Interrompiamo l'esecuzione qui per il client, il resto è logica server-only
-} else {
+// Risolutore remoto (server dell'autore). Sul client era l'unica strada; ora è la riserva
+// quando lo scraping locale non trova nulla. Accetta movie/series/anime: le app passano le
+// serie come "tv", che il server rifiuta ("Unsupported media type").
+async function remoteResolve(id, type, season, episode) {
+    try {
+        const remoteType = (type === 'tv' || type === 'show') ? 'series' : type;
+        const url = `https://easystreams.realbestia.com/resolve/guardoserie?id=${id}&type=${remoteType}&s=${season || 1}&ep=${episode || 1}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        return (data && data.streams) || [];
+    } catch (e) {
+        console.error('[Guardoserie-Client] API Error:', e.message);
+        return [];
+    }
+}
 
-    // SIAMO SU SERVER: carichiamo le librerie pesanti
+// Lo scraping locale ora gira ovunque: nell'app NuvioTV le richieste passano dal suo fetch,
+// che supera da solo la verifica Cloudflare (WebView), e smartFetch ripiega su fetch quando
+// mancano le librerie Node.
+{
     const { smartFetch } = require('../utils/cf_handler');
     const { hasActiveBypass } = require('../../cf_bypass');
     const { USER_AGENT, getProxiedUrl } = require('../extractors/common');
     const { extractLoadm } = require('../extractors/loadm');
-    const STEP_BENCH_ENABLED = String(process.env.PROVIDER_STEP_BENCH || '').trim().toLowerCase() === '1';
+    const STEP_BENCH_ENABLED = String((IS_SERVER && process.env.PROVIDER_STEP_BENCH) || '').trim().toLowerCase() === '1';
     const GUARDOSERIE_SEARCH_TIMEOUT_MS = 2000;
     const GUARDOSERIE_CONFIG_URL = 'https://raw.githubusercontent.com/realbestia1/domains/refs/heads/main/domains.json';
     let guardoserieBaseUrl = null;
@@ -781,5 +782,20 @@ if (!IS_SERVER) {
         return nestedStreams.flat().filter(Boolean);
     }
 
-    module.exports = { getStreams };
+    if (IS_SERVER) {
+        module.exports = { getStreams };
+    } else {
+        module.exports = {
+            getStreams: async (id, type, season, episode) => {
+                let local = [];
+                try {
+                    local = (await getStreams(id, type, season, episode)) || [];
+                } catch (e) {
+                    console.error('[Guardoserie-Client] Local scrape error:', e.message);
+                }
+                if (local.length > 0) return local;
+                return remoteResolve(id, type, season, episode);
+            }
+        };
+    }
 }
