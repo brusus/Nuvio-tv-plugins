@@ -657,7 +657,16 @@ var require_cf_handler = __commonJS({
     function smartFetch(_0, _1) {
       return __async(this, arguments, function* (url, domain, options = {}) {
         var _a, _b;
-        if (!axios) return plainFetch(url, options);
+        if (!axios) {
+          const res = yield plainFetch(url, options);
+          if (options.meta && res.url) {
+            try {
+              options.meta.finalUrl = new URL(res.url).toString();
+            } catch (_) {
+            }
+          }
+          return res.data;
+        }
         const getHost = (u) => {
           try {
             return new URL(u).hostname.replace("www.", "");
