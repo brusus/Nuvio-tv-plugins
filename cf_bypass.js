@@ -1,7 +1,22 @@
-const { spawn, execFile } = require('child_process');
-const path = require('path');
-const fs = require('fs');
-const http = require('http');
+// Node-only (spawns the Python/browser bypass daemon). This file is also bundled into
+// providers that run inside the NuvioTV app (QuickJS), where these modules and `process`
+// don't exist: load them defensively so importing the file never throws there, and make
+// getClearance() reject cleanly instead (see NODE_AVAILABLE).
+let spawn = null;
+let execFile = null;
+let path = null;
+let fs = null;
+let http = null;
+try {
+    ({ spawn, execFile } = require('child_process'));
+    path = require('path');
+    fs = require('fs');
+    http = require('http');
+} catch (_) {
+    path = null;
+}
+const NODE_AVAILABLE = path !== null;
+const ENV = (typeof process !== 'undefined' && process.env) ? process.env : {};
 
 /**
  * Cloudflare Bypass using Scrapling (Python) & Persistent Browser Daemon
@@ -11,10 +26,10 @@ const activeBypasses = new Map();
 const globalQueue = [];
 let activeGlobalRequests = 0;
 
-const MAX_GLOBAL_CONCURRENT = parseInt(process.env.SCRAPLING_MAX_CONCURRENT || '5', 10);
-const MAX_GLOBAL_QUEUE = parseInt(process.env.SCRAPLING_MAX_QUEUE || '50', 10);
-const GLOBAL_QUEUE_TIMEOUT = parseInt(process.env.SCRAPLING_QUEUE_TIMEOUT_MS || '60000', 10);
-const SCRAPLING_DEFAULT_TIMEOUT = parseInt(process.env.SCRAPLING_DEFAULT_TIMEOUT_MS || '90000', 10);
+const MAX_GLOBAL_CONCURRENT = parseInt(ENV.SCRAPLING_MAX_CONCURRENT || '5', 10);
+const MAX_GLOBAL_QUEUE = parseInt(ENV.SCRAPLING_MAX_QUEUE || '50', 10);
+const GLOBAL_QUEUE_TIMEOUT = parseInt(ENV.SCRAPLING_QUEUE_TIMEOUT_MS || '60000', 10);
+const SCRAPLING_DEFAULT_TIMEOUT = parseInt(ENV.SCRAPLING_DEFAULT_TIMEOUT_MS || '90000', 10);
 
 let daemonProcess = null;
 let camoufoxReady = false;
@@ -220,6 +235,7 @@ async function requestDaemon(url, provider, options = {}) {
 }
 
 function execPythonBypass(url, provider, options = {}) {
+    if (!NODE_AVAILABLE) return Promise.reject(new Error('Cloudflare bypass unavailable in this runtime'));
     return requestDaemon(url, provider, options);
 }
 
@@ -262,6 +278,7 @@ async function runBypass(url, provider, options, sessionFile) {
 }
 
 async function getClearance(url, provider = 'default', options = {}) {
+    if (!NODE_AVAILABLE) throw new Error('Cloudflare bypass unavailable in this runtime');
     const sessionFile = path.join(process.cwd(), `cf-session-${provider}.json`);
 
     if (activeBypasses.has(provider)) {

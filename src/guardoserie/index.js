@@ -409,11 +409,16 @@ if (!IS_SERVER) {
         };
 
         // Controlla se esiste una sessione CF caricabile (la validità effettiva sarà verificata dinamicamente dalle risposte HTTP)
-        const sessionFile = `${process.cwd()}/cf-session-guardoserie.json`;
-        const fs = require('fs');
-        let isSessionValid = false;
+        // Server (Node): a Cloudflare session file must exist, else skip and bypass in the
+        // background. NuvioTV app (QuickJS, no fs/process): there is no session file, and
+        // the app's own fetch clears Cloudflare challenges itself - so just go ahead.
+        let fs = null;
+        try { fs = require('fs'); } catch (_) { fs = null; }
+        const appRuntime = !fs || typeof process === 'undefined';
+        const sessionFile = appRuntime ? '' : `${process.cwd()}/cf-session-guardoserie.json`;
+        let isSessionValid = appRuntime;
 
-        if (fs.existsSync(sessionFile)) {
+        if (!appRuntime && fs.existsSync(sessionFile)) {
             try {
                 const data = JSON.parse(fs.readFileSync(sessionFile, 'utf8'));
                 if (data && data.userAgent && data.cookies) {

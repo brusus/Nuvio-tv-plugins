@@ -309,17 +309,28 @@ var require_quality_helper = __commonJS({
 // cf_bypass.js
 var require_cf_bypass = __commonJS({
   "cf_bypass.js"(exports2, module2) {
-    var { spawn, execFile } = require("child_process");
-    var path = require("path");
-    var fs = require("fs");
-    var http = require("http");
+    var spawn = null;
+    var execFile = null;
+    var path = null;
+    var fs = null;
+    var http = null;
+    try {
+      ({ spawn, execFile } = require("child_process"));
+      path = require("path");
+      fs = require("fs");
+      http = require("http");
+    } catch (_) {
+      path = null;
+    }
+    var NODE_AVAILABLE = path !== null;
+    var ENV = typeof process !== "undefined" && process.env ? process.env : {};
     var activeBypasses = /* @__PURE__ */ new Map();
     var globalQueue = [];
     var activeGlobalRequests = 0;
-    var MAX_GLOBAL_CONCURRENT = parseInt(process.env.SCRAPLING_MAX_CONCURRENT || "5", 10);
-    var MAX_GLOBAL_QUEUE = parseInt(process.env.SCRAPLING_MAX_QUEUE || "50", 10);
-    var GLOBAL_QUEUE_TIMEOUT = parseInt(process.env.SCRAPLING_QUEUE_TIMEOUT_MS || "60000", 10);
-    var SCRAPLING_DEFAULT_TIMEOUT = parseInt(process.env.SCRAPLING_DEFAULT_TIMEOUT_MS || "90000", 10);
+    var MAX_GLOBAL_CONCURRENT = parseInt(ENV.SCRAPLING_MAX_CONCURRENT || "5", 10);
+    var MAX_GLOBAL_QUEUE = parseInt(ENV.SCRAPLING_MAX_QUEUE || "50", 10);
+    var GLOBAL_QUEUE_TIMEOUT = parseInt(ENV.SCRAPLING_QUEUE_TIMEOUT_MS || "60000", 10);
+    var SCRAPLING_DEFAULT_TIMEOUT = parseInt(ENV.SCRAPLING_DEFAULT_TIMEOUT_MS || "90000", 10);
     var daemonProcess = null;
     var camoufoxReady = false;
     var camoufoxEnsurePromise = null;
@@ -505,6 +516,7 @@ var require_cf_bypass = __commonJS({
       });
     }
     function execPythonBypass(url, provider, options = {}) {
+      if (!NODE_AVAILABLE) return Promise.reject(new Error("Cloudflare bypass unavailable in this runtime"));
       return requestDaemon(url, provider, options);
     }
     function runBypass(url, provider, options, sessionFile) {
@@ -538,6 +550,7 @@ var require_cf_bypass = __commonJS({
     }
     function getClearance(_0) {
       return __async(this, arguments, function* (url, provider = "default", options = {}) {
+        if (!NODE_AVAILABLE) throw new Error("Cloudflare bypass unavailable in this runtime");
         const sessionFile = path.join(process.cwd(), `cf-session-${provider}.json`);
         if (activeBypasses.has(provider)) {
           return activeBypasses.get(provider);
@@ -572,25 +585,79 @@ var require_cf_bypass = __commonJS({
 // src/utils/cf_handler.js
 var require_cf_handler = __commonJS({
   "src/utils/cf_handler.js"(exports2, module2) {
-    var axios = require("axios");
-    var fs = require("fs");
-    var path = require("path");
-    var { getClearance } = require_cf_bypass();
-    var https = require("https");
-    var http = require("http");
-    var agentOptions = {
-      keepAlive: true,
-      maxSockets: 250,
-      maxFreeSockets: 100,
-      timeout: 3e4,
-      keepAliveMsecs: 3e4
-    };
-    var httpsAgent = new https.Agent(agentOptions);
-    var httpAgent = new http.Agent(agentOptions);
+    var axios = null;
+    var fs = null;
+    var path = null;
+    var getClearance = null;
+    var httpsAgent = null;
+    var httpAgent = null;
+    try {
+      axios = require("axios");
+      fs = require("fs");
+      path = require("path");
+      ({ getClearance } = require_cf_bypass());
+      const https = require("https");
+      const http = require("http");
+      const agentOptions = {
+        keepAlive: true,
+        maxSockets: 250,
+        maxFreeSockets: 100,
+        timeout: 3e4,
+        keepAliveMsecs: 3e4
+      };
+      httpsAgent = new https.Agent(agentOptions);
+      httpAgent = new http.Agent(agentOptions);
+    } catch (_) {
+      axios = null;
+    }
     var sessionCache = /* @__PURE__ */ new Map();
+    var DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+    function plainFetch(_0) {
+      return __async(this, arguments, function* (url, options = {}) {
+        const headers = __spreadValues({
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+          "Accept-Language": "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7"
+        }, options.headers || {});
+        if (!headers["user-agent"] && !headers["User-Agent"]) {
+          headers["User-Agent"] = DEFAULT_USER_AGENT;
+        }
+        const timeoutMs = options.timeout || 3e4;
+        let timeoutId;
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => {
+            const err = new Error(`timeout of ${timeoutMs}ms exceeded`);
+            err.code = "ECONNABORTED";
+            reject(err);
+          }, timeoutMs);
+        });
+        try {
+          const response = yield Promise.race([
+            fetch(url, { method: options.method || "GET", headers, body: options.body }),
+            timeoutPromise
+          ]);
+          const data = options.responseType === "json" ? yield response.json() : yield response.text();
+          const responseUrl = response.url || url;
+          if (response.status >= 400 && response.status !== 403 && response.status !== 503) {
+            const err = new Error(`HTTP ${response.status}`);
+            err.response = { status: response.status, data, url: responseUrl };
+            throw err;
+          }
+          const responseHeaders = {};
+          if (response.headers && typeof response.headers.forEach === "function") {
+            response.headers.forEach((value, key) => {
+              responseHeaders[key.toLowerCase()] = value;
+            });
+          }
+          return { data, status: response.status, headers: responseHeaders, url: responseUrl };
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      });
+    }
     function smartFetch(_0, _1) {
       return __async(this, arguments, function* (url, domain, options = {}) {
         var _a, _b;
+        if (!axios) return plainFetch(url, options);
         const getHost = (u) => {
           try {
             return new URL(u).hostname.replace("www.", "");
@@ -7902,10 +7969,16 @@ var require_guardoserie = __commonJS({
             if (!STEP_BENCH_ENABLED) return;
             bench.push(__spreadValues({ step, t: Date.now() - benchStart }, meta));
           };
-          const sessionFile = `${process.cwd()}/cf-session-guardoserie.json`;
-          const fs = require("fs");
-          let isSessionValid = false;
-          if (fs.existsSync(sessionFile)) {
+          let fs = null;
+          try {
+            fs = require("fs");
+          } catch (_) {
+            fs = null;
+          }
+          const appRuntime = !fs || typeof process === "undefined";
+          const sessionFile = appRuntime ? "" : `${process.cwd()}/cf-session-guardoserie.json`;
+          let isSessionValid = appRuntime;
+          if (!appRuntime && fs.existsSync(sessionFile)) {
             try {
               const data = JSON.parse(fs.readFileSync(sessionFile, "utf8"));
               if (data && data.userAgent && data.cookies) {

@@ -1,31 +1,90 @@
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-const { getClearance } = require('../../cf_bypass');
-const https = require('https');
-const http = require('http');
-
-// Connection pooling configuration
-const agentOptions = {
-    keepAlive: true,
-    maxSockets: 250,
-    maxFreeSockets: 100,
-    timeout: 30000,
-    keepAliveMsecs: 30000
-};
-
-const httpsAgent = new https.Agent(agentOptions);
-const httpAgent = new http.Agent(agentOptions);
+// Node-only dependencies (axios, the Puppeteer-based clearance helper, fs, agents). The
+// NuvioTV app runs providers in QuickJS, where require() only knows cheerio/crypto-js:
+// a hard require here threw at load time and made every provider bundling this file
+// (Guardoserie) fail before running. Without them smartFetch falls back to plain fetch.
+let axios = null;
+let fs = null;
+let path = null;
+let getClearance = null;
+let httpsAgent = null;
+let httpAgent = null;
+try {
+    axios = require('axios');
+    fs = require('fs');
+    path = require('path');
+    ({ getClearance } = require('../../cf_bypass'));
+    const https = require('https');
+    const http = require('http');
+    // Connection pooling configuration
+    const agentOptions = {
+        keepAlive: true,
+        maxSockets: 250,
+        maxFreeSockets: 100,
+        timeout: 30000,
+        keepAliveMsecs: 30000
+    };
+    httpsAgent = new https.Agent(agentOptions);
+    httpAgent = new http.Agent(agentOptions);
+} catch (_) {
+    axios = null;
+}
 
 // In-memory cache for CF sessions to avoid disk I/O on every request
 const sessionCache = new Map();
 
+const DEFAULT_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
+/**
+ * smartFetch for runtimes without the Node stack (NuvioTV app): same request headers and
+ * the same { data, status, headers, url } result / "HTTP <status>" errors as doRequest,
+ * so callers behave identically. 403/503 are returned, not thrown, exactly like the Node
+ * path does, letting callers recognise a Cloudflare page.
+ */
+async function plainFetch(url, options = {}) {
+    const headers = {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7',
+        ...(options.headers || {})
+    };
+    if (!headers['user-agent'] && !headers['User-Agent']) {
+        headers['User-Agent'] = DEFAULT_USER_AGENT;
+    }
+    const timeoutMs = options.timeout || 30000;
+    let timeoutId;
+    const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+            const err = new Error(`timeout of ${timeoutMs}ms exceeded`);
+            err.code = 'ECONNABORTED';
+            reject(err);
+        }, timeoutMs);
+    });
+    try {
+        const response = await Promise.race([
+            fetch(url, { method: options.method || 'GET', headers, body: options.body }),
+            timeoutPromise
+        ]);
+        const data = options.responseType === 'json' ? await response.json() : await response.text();
+        const responseUrl = response.url || url;
+        if (response.status >= 400 && response.status !== 403 && response.status !== 503) {
+            const err = new Error(`HTTP ${response.status}`);
+            err.response = { status: response.status, data, url: responseUrl };
+            throw err;
+        }
+        const responseHeaders = {};
+        if (response.headers && typeof response.headers.forEach === 'function') {
+            response.headers.forEach((value, key) => { responseHeaders[key.toLowerCase()] = value; });
+        }
+        return { data, status: response.status, headers: responseHeaders, url: responseUrl };
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
 
 /**
  * Executes fetch with automatic Cloudflare handling
  */
 async function smartFetch(url, domain, options = {}) {
+    if (!axios) return plainFetch(url, options);
     const getHost = (u) => {
         try { return new URL(u).hostname.replace('www.', ''); } catch (e) { return u; }
     };
