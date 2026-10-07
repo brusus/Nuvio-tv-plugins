@@ -1159,6 +1159,60 @@ function extractAnimeUnityPaths(mappingPayload) {
   return uniqueStrings(paths);
 }
 
+// Fallback quando la mappatura esterna non ha percorsi AnimeUnity (succede: es. Sword Art
+// Online Alicization - War of Underworld Part 2 ha AnimeWorld/AnimeSaturn ma non AnimeUnity).
+// Cerca nell'archivio del sito e tiene solo le serie con lo stesso ID MyAnimeList/AniList
+// della mappatura: nessun abbinamento "a occhio" sui titoli. Restituisce sub e ITA.
+async function searchAnimeUnityPathsByIds(mappingPayload) {
+  const ids = mappingPayload?.mappings?.ids || {};
+  const malId = String(ids.mal || "").trim();
+  const anilistId = String(ids.anilist || "").trim();
+  if (!malId && !anilistId) return [];
+
+  const kitsu = mappingPayload?.kitsu || {};
+  const titles = uniqueStrings(
+    [kitsu?.titles?.en, kitsu?.titles?.en_jp, kitsu?.canonicalTitle]
+      .filter(Boolean)
+      .map((title) =>
+        String(title)
+          .replace(/\([^)]*\)/g, " ")
+          .replace(/[:\-–]/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+      )
+      .filter(Boolean)
+  );
+
+  const paths = [];
+  for (const title of titles.slice(0, 3)) {
+    // Le prime parole bastano all'archivio e reggono le differenze di sottotitolo
+    // ("2nd cour" vs "Part 2"); l'ID decide quale risultato è quello giusto.
+    const query = title.split(" ").slice(0, 4).join(" ");
+    try {
+      const html = await fetchResource(`${unityBaseUrl}/archivio?title=${encodeURIComponent(query)}`, {
+        as: "text",
+        ttlMs: TTL.mapping,
+        cacheKey: `archivio:${query.toLowerCase()}`,
+        timeoutMs: FETCH_TIMEOUT
+      });
+      const match = String(html || "").match(/<archivio[^>]*\srecords="([^"]*)"/i);
+      if (!match) continue;
+      const records = JSON.parse(decodeHtmlEntities(match[1]));
+      for (const record of Array.isArray(records) ? records : []) {
+        const sameMal = malId && String(record?.mal_id ?? "") === malId;
+        const sameAnilist = anilistId && String(record?.anilist_id ?? "") === anilistId;
+        if (!sameMal && !sameAnilist) continue;
+        const path = normalizeAnimePath(`/anime/${record.id}-${record.slug || ""}`);
+        if (path) paths.push(path);
+      }
+      if (paths.length > 0) break;
+    } catch (error) {
+      console.error("[AnimeUnity] archive search failed:", error.message);
+    }
+  }
+  return uniqueStrings(paths);
+}
+
 function extractTmdbIdFromMappingPayload(mappingPayload) {
   const candidate =
     mappingPayload?.mappings?.ids?.tmdb ||
@@ -1375,6 +1429,12 @@ async function getStreams(id, type, season, episode, providerContext = null) {
       }
     }
 
+    if (animePaths.length === 0) {
+      animePaths = await searchAnimeUnityPathsByIds(mappingPayload);
+      if (animePaths.length > 0) {
+        console.log(`[AnimeUnity] Mapping senza AnimeUnity: trovati ${animePaths.length} percorsi via archivio`);
+      }
+    }
     if (animePaths.length === 0) return [];
 
     const requestedEpisode = resolveEpisodeFromMappingPayload(mappingPayload, lookup.episode);

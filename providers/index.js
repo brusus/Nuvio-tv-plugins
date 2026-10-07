@@ -10770,6 +10770,47 @@ var require_animeunity = __commonJS({
       }
       return uniqueStrings(paths);
     }
+    function searchAnimeUnityPathsByIds(mappingPayload) {
+      return __async(this, null, function* () {
+        var _a, _b, _c, _d, _e;
+        const ids = ((_a = mappingPayload == null ? void 0 : mappingPayload.mappings) == null ? void 0 : _a.ids) || {};
+        const malId = String(ids.mal || "").trim();
+        const anilistId = String(ids.anilist || "").trim();
+        if (!malId && !anilistId) return [];
+        const kitsu = (mappingPayload == null ? void 0 : mappingPayload.kitsu) || {};
+        const titles = uniqueStrings(
+          [(_b = kitsu == null ? void 0 : kitsu.titles) == null ? void 0 : _b.en, (_c = kitsu == null ? void 0 : kitsu.titles) == null ? void 0 : _c.en_jp, kitsu == null ? void 0 : kitsu.canonicalTitle].filter(Boolean).map(
+            (title) => String(title).replace(/\([^)]*\)/g, " ").replace(/[:\-–]/g, " ").replace(/\s+/g, " ").trim()
+          ).filter(Boolean)
+        );
+        const paths = [];
+        for (const title of titles.slice(0, 3)) {
+          const query = title.split(" ").slice(0, 4).join(" ");
+          try {
+            const html = yield fetchResource(`${unityBaseUrl}/archivio?title=${encodeURIComponent(query)}`, {
+              as: "text",
+              ttlMs: TTL.mapping,
+              cacheKey: `archivio:${query.toLowerCase()}`,
+              timeoutMs: FETCH_TIMEOUT
+            });
+            const match = String(html || "").match(/<archivio[^>]*\srecords="([^"]*)"/i);
+            if (!match) continue;
+            const records = JSON.parse(decodeHtmlEntities(match[1]));
+            for (const record of Array.isArray(records) ? records : []) {
+              const sameMal = malId && String((_d = record == null ? void 0 : record.mal_id) != null ? _d : "") === malId;
+              const sameAnilist = anilistId && String((_e = record == null ? void 0 : record.anilist_id) != null ? _e : "") === anilistId;
+              if (!sameMal && !sameAnilist) continue;
+              const path = normalizeAnimePath(`/anime/${record.id}-${record.slug || ""}`);
+              if (path) paths.push(path);
+            }
+            if (paths.length > 0) break;
+          } catch (error) {
+            console.error("[AnimeUnity] archive search failed:", error.message);
+          }
+        }
+        return uniqueStrings(paths);
+      });
+    }
     function extractTmdbIdFromMappingPayload(mappingPayload) {
       var _a, _b, _c;
       const candidate = ((_b = (_a = mappingPayload == null ? void 0 : mappingPayload.mappings) == null ? void 0 : _a.ids) == null ? void 0 : _b.tmdb) || ((_c = mappingPayload == null ? void 0 : mappingPayload.ids) == null ? void 0 : _c.tmdb) || (mappingPayload == null ? void 0 : mappingPayload.tmdbId) || null;
@@ -10958,6 +10999,12 @@ var require_animeunity = __commonJS({
                 mappingPayload = tmdbPayload;
                 animePaths = tmdbPaths;
               }
+            }
+          }
+          if (animePaths.length === 0) {
+            animePaths = yield searchAnimeUnityPathsByIds(mappingPayload);
+            if (animePaths.length > 0) {
+              console.log(`[AnimeUnity] Mapping senza AnimeUnity: trovati ${animePaths.length} percorsi via archivio`);
             }
           }
           if (animePaths.length === 0) return [];
