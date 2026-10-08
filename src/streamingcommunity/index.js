@@ -253,6 +253,10 @@ async function ensureSession() {
       // comunque accettato. Solo 4xx = credenziali/CSRF rifiutati (anonimo);
       // 5xx = errore server, si ritenta al giro successivo.
       const loginOk = response.ok || (response.status >= 300 && response.status < 400);
+      // Riga letta dall'app dopo il salvataggio dell'accesso, per avvisare l'utente
+      // se email o password sono sbagliate (401/422) invece di restare in silenzio.
+      const loginRejected = response.status === 401 || response.status === 422;
+      console.log("[NUVIO_LOGIN] " + (loginOk ? "ok" : loginRejected ? "rejected" : "error"));
       if (!loginOk) {
         if (response.status >= 500) {
           scSessionCookie = null;          // errore server: ritenta al prossimo giro
@@ -752,20 +756,45 @@ async function getStreams(id, type, season, episode, providerContext = null) {
         ['lang', embedParams.get('lang') || 'en']
       ];
       const playlistSeparator = masterPlaylist.url.includes('?') ? '&' : '?';
-      const streamUrl = rewriteStreamingCommunityHost(
+      let streamUrl = rewriteStreamingCommunityHost(
         `${masterPlaylist.url}${playlistSeparator}${playlistParams
           .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
           .join('&')}`
       );
       const cleanEmbedUrl = rewriteStreamingCommunityHost(embedUrl);
       const cleanIframeUrl = rewriteStreamingCommunityHost(item.iframeUrl || cleanEmbedUrl);
-      const streamHeaders = getPlaylistHeaders(embedUrl);
+      let streamHeaders = getPlaylistHeaders(embedUrl);
       if (embedCookies) streamHeaders.Cookie = embedCookies;
       console.log(`[StreamingCommunity] Final stream URL (${item.source}): ${streamUrl}`);
 
       let quality = "1080p";
       let hasItalianAudio = false;
       let playlistFetched = false;
+
+      // La variante 1080p esiste solo nella playlist servita da vixcloud.co: la
+      // stessa richiesta (stesso token, h=1) su vixsrc.to si ferma a 720p. Quando
+      // h=1 e' concesso si prova prima vixcloud.co e si tiene solo se da' davvero
+      // il 1080p; altrimenti si resta sull'host abituale.
+      if (playlistParams.some(([key]) => key === 'h')) {
+        const fhdUrl = streamUrl.replace(/^https?:\/\/[^/]+/i, 'https://vixcloud.co');
+        const fhdHeaders = {
+          ...streamHeaders,
+          Referer: String(streamHeaders.Referer || '').replace(/^https?:\/\/[^/]+/i, 'https://vixcloud.co'),
+          Origin: 'https://vixcloud.co'
+        };
+        try {
+          const fhdResponse = await fetch(fhdUrl, { headers: fhdHeaders, dispatcher: proxyAgent || undefined });
+          const fhdText = fhdResponse.ok ? await fhdResponse.text() : '';
+          if (/RESOLUTION=\d+x1080\b/i.test(fhdText)) {
+            console.log(`[StreamingCommunity] 1080p disponibile su vixcloud.co (${item.source})`);
+            streamUrl = fhdUrl;
+            streamHeaders = fhdHeaders;
+          }
+        } catch (e) {
+          console.warn(`[StreamingCommunity] Controllo 1080p fallito: ${e.message}`);
+        }
+      }
+
       try {
         const playlistResponse = await fetch(streamUrl, {
           headers: streamHeaders,
@@ -819,6 +848,9 @@ async function getStreams(id, type, season, episode, providerContext = null) {
     // Entrambe dichiarano una traccia audio ita, quindi il filtro per lingua
     // non bastava a distinguerle: si restituiscono entrambe, italiane prima,
     // deduplicando per URL.
+    // La variante 1080p per prima: e' quella che l'utente si aspetta di avviare.
+    const isFhd = s => /FHD|1080/i.test(String(s.qualityTag || s.quality || ''));
+    streams.sort((a, b) => Number(isFhd(b)) - Number(isFhd(a)));
     const itaStreams = streams.filter(s => Boolean(s.language) || s.title?.includes('🇮🇹'));
     const otherStreams = streams.filter(s => !itaStreams.includes(s));
 

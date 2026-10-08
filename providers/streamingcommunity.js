@@ -498,6 +498,8 @@ function ensureSession() {
         jar = mergeCookies(jar, getResponseCookies(response));
         console.log("[StreamingCommunity] Login premium: HTTP " + response.status);
         const loginOk = response.ok || response.status >= 300 && response.status < 400;
+        const loginRejected = response.status === 401 || response.status === 422;
+        console.log("[NUVIO_LOGIN] " + (loginOk ? "ok" : loginRejected ? "rejected" : "error"));
         if (!loginOk) {
           if (response.status >= 500) {
             scSessionCookie = null;
@@ -965,17 +967,35 @@ function getStreams(id, type, season, episode, providerContext = null) {
           ["lang", embedParams.get("lang") || "en"]
         ];
         const playlistSeparator = masterPlaylist.url.includes("?") ? "&" : "?";
-        const streamUrl = rewriteStreamingCommunityHost(
+        let streamUrl = rewriteStreamingCommunityHost(
           `${masterPlaylist.url}${playlistSeparator}${playlistParams.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join("&")}`
         );
         const cleanEmbedUrl = rewriteStreamingCommunityHost(embedUrl);
         const cleanIframeUrl = rewriteStreamingCommunityHost(item.iframeUrl || cleanEmbedUrl);
-        const streamHeaders = getPlaylistHeaders(embedUrl);
+        let streamHeaders = getPlaylistHeaders(embedUrl);
         if (embedCookies) streamHeaders.Cookie = embedCookies;
         console.log(`[StreamingCommunity] Final stream URL (${item.source}): ${streamUrl}`);
         let quality = "1080p";
         let hasItalianAudio = false;
         let playlistFetched = false;
+        if (playlistParams.some(([key]) => key === "h")) {
+          const fhdUrl = streamUrl.replace(/^https?:\/\/[^/]+/i, "https://vixcloud.co");
+          const fhdHeaders = __spreadProps(__spreadValues({}, streamHeaders), {
+            Referer: String(streamHeaders.Referer || "").replace(/^https?:\/\/[^/]+/i, "https://vixcloud.co"),
+            Origin: "https://vixcloud.co"
+          });
+          try {
+            const fhdResponse = yield fetch(fhdUrl, { headers: fhdHeaders, dispatcher: proxyAgent || void 0 });
+            const fhdText = fhdResponse.ok ? yield fhdResponse.text() : "";
+            if (/RESOLUTION=\d+x1080\b/i.test(fhdText)) {
+              console.log(`[StreamingCommunity] 1080p disponibile su vixcloud.co (${item.source})`);
+              streamUrl = fhdUrl;
+              streamHeaders = fhdHeaders;
+            }
+          } catch (e) {
+            console.warn(`[StreamingCommunity] Controllo 1080p fallito: ${e.message}`);
+          }
+        }
         try {
           const playlistResponse = yield fetch(streamUrl, {
             headers: streamHeaders,
@@ -1017,6 +1037,8 @@ function getStreams(id, type, season, episode, providerContext = null) {
         const formatted = formatStream(result, "StreamingCommunity");
         if (formatted) streams.push(formatted);
       }
+      const isFhd = (s) => /FHD|1080/i.test(String(s.qualityTag || s.quality || ""));
+      streams.sort((a, b) => Number(isFhd(b)) - Number(isFhd(a)));
       const itaStreams = streams.filter((s) => {
         var _a;
         return Boolean(s.language) || ((_a = s.title) == null ? void 0 : _a.includes("\u{1F1EE}\u{1F1F9}"));
