@@ -264,7 +264,10 @@ var require_domain_helper = __commonJS({
             const res = yield fetch(start + "/", {
               headers: {
                 "User-Agent": userAgent || DEFAULT_UA,
-                "Accept-Language": "it-IT,it;q=0.9"
+                "Accept-Language": "it-IT,it;q=0.9",
+                // Solo un sondaggio: se il sito risponde con una verifica Cloudflare,
+                // l'app non deve aprire la finestra interattiva per questa richiesta.
+                "X-Nuvio-No-Challenge": "1"
               }
             });
             if (res && res.body && typeof res.body.cancel === "function") {
