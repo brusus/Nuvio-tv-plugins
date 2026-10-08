@@ -216,7 +216,7 @@
         "tv",
         "series"
       ],
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "easystreams-cc",
@@ -271,7 +271,7 @@
         "tv",
         "series"
       ],
-      "enabled": true
+      "enabled": false
     },
     {
       "id": "nuviotv-cb01",
