@@ -1170,6 +1170,57 @@ function extractAnimeWorldPaths(mappingPayload) {
   }
   return uniqueStrings(paths);
 }
+function pageHasTrackerId(html, malId, anilistId) {
+  const text = String(html || "");
+  const hasId = (pattern, expected) => Boolean(expected) && [...text.matchAll(pattern)].some((match) => match[1] === expected);
+  return hasId(/myanimelist\.net\/anime\/(\d+)/gi, malId) || hasId(/anilist\.co\/anime\/(\d+)/gi, anilistId);
+}
+function searchAnimeWorldPathsByIds(mappingPayload) {
+  return __async(this, null, function* () {
+    var _a, _b, _c;
+    const ids = ((_a = mappingPayload == null ? void 0 : mappingPayload.mappings) == null ? void 0 : _a.ids) || {};
+    const malId = String(ids.mal || "").trim();
+    const anilistId = String(ids.anilist || "").trim();
+    if (!malId && !anilistId) return [];
+    const kitsu = (mappingPayload == null ? void 0 : mappingPayload.kitsu) || {};
+    const titles = uniqueStrings(
+      [(_b = kitsu == null ? void 0 : kitsu.titles) == null ? void 0 : _b.en, (_c = kitsu == null ? void 0 : kitsu.titles) == null ? void 0 : _c.en_jp, kitsu == null ? void 0 : kitsu.canonicalTitle].filter(Boolean).map(
+        (title) => String(title).replace(/\([^)]*\)/g, " ").replace(/[:\-–’']/g, " ").replace(/\s+/g, " ").trim()
+      ).filter(Boolean)
+    );
+    const checked = /* @__PURE__ */ new Set();
+    for (const title of titles.slice(0, 3)) {
+      const query = title.split(" ").slice(0, 4).join(" ");
+      let candidates = [];
+      try {
+        const html = yield fetchResource(`${getWorldBaseUrl()}/search?keyword=${encodeURIComponent(query)}`, {
+          ttlMs: TTL.mapping,
+          cacheKey: `search:${query.toLowerCase()}`,
+          timeoutMs: FETCH_TIMEOUT
+        });
+        candidates = uniqueStrings(
+          [...String(html || "").matchAll(/href=["']([^"']*\/play\/[^"'?#]+)/gi)].map((match) => normalizeAnimeWorldPath(match[1])).filter(Boolean)
+        ).filter((path) => !checked.has(path));
+      } catch (error) {
+        console.error("[AnimeWorld] search failed:", error.message);
+        continue;
+      }
+      const batch = candidates.slice(0, 20);
+      batch.forEach((path) => checked.add(path));
+      const matches = yield mapLimit(batch, 3, (path) => __async(null, null, function* () {
+        const html = yield fetchResource(buildWorldUrl(path), {
+          ttlMs: TTL.page,
+          cacheKey: `id-check:${path}`,
+          timeoutMs: FETCH_TIMEOUT
+        });
+        return pageHasTrackerId(html, malId, anilistId) ? path : null;
+      }));
+      const paths = matches.filter((path) => typeof path === "string");
+      if (paths.length > 0) return uniqueStrings(paths);
+    }
+    return [];
+  });
+}
 function extractTmdbIdFromMappingPayload(mappingPayload) {
   var _a, _b, _c;
   const candidate = ((_b = (_a = mappingPayload == null ? void 0 : mappingPayload.mappings) == null ? void 0 : _a.ids) == null ? void 0 : _b.tmdb) || ((_c = mappingPayload == null ? void 0 : mappingPayload.ids) == null ? void 0 : _c.tmdb) || (mappingPayload == null ? void 0 : mappingPayload.tmdbId) || null;
@@ -1234,6 +1285,9 @@ function getStreams(id, type, season, episode, providerContext = null) {
             animePaths = tmdbPaths;
           }
         }
+      }
+      if (animePaths.length === 0) {
+        animePaths = yield searchAnimeWorldPathsByIds(mappingPayload);
       }
       if (animePaths.length === 0) return [];
       const requestedEpisode = resolveEpisodeFromMappingPayload(mappingPayload, lookup.episode);

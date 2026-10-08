@@ -988,6 +988,77 @@ function extractAnimeWorldPaths(mappingPayload) {
   return uniqueStrings(paths);
 }
 
+function pageHasTrackerId(html, malId, anilistId) {
+  const text = String(html || "");
+  const hasId = (pattern, expected) =>
+    Boolean(expected) && [...text.matchAll(pattern)].some((match) => match[1] === expected);
+  return (
+    hasId(/myanimelist\.net\/anime\/(\d+)/gi, malId) ||
+    hasId(/anilist\.co\/anime\/(\d+)/gi, anilistId)
+  );
+}
+
+// Fallback quando la mappatura esterna non ha percorsi AnimeWorld. Cerca sul sito per titolo e
+// tiene solo le serie la cui pagina rimanda allo stesso ID MyAnimeList/AniList della
+// mappatura: nessun abbinamento "a occhio" sui titoli. Restituisce sub e ITA.
+async function searchAnimeWorldPathsByIds(mappingPayload) {
+  const ids = mappingPayload?.mappings?.ids || {};
+  const malId = String(ids.mal || "").trim();
+  const anilistId = String(ids.anilist || "").trim();
+  if (!malId && !anilistId) return [];
+
+  const kitsu = mappingPayload?.kitsu || {};
+  const titles = uniqueStrings(
+    [kitsu?.titles?.en, kitsu?.titles?.en_jp, kitsu?.canonicalTitle]
+      .filter(Boolean)
+      .map((title) =>
+        String(title)
+          .replace(/\([^)]*\)/g, " ")
+          .replace(/[:\-–’']/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+      )
+      .filter(Boolean)
+  );
+
+  const checked = new Set();
+  for (const title of titles.slice(0, 3)) {
+    // Le prime parole bastano alla ricerca e reggono le differenze di sottotitolo
+    // ("2nd cour" vs "Part 2"); l'ID decide quale risultato è quello giusto.
+    const query = title.split(" ").slice(0, 4).join(" ");
+    let candidates = [];
+    try {
+      const html = await fetchResource(`${getWorldBaseUrl()}/search?keyword=${encodeURIComponent(query)}`, {
+        ttlMs: TTL.mapping,
+        cacheKey: `search:${query.toLowerCase()}`,
+        timeoutMs: FETCH_TIMEOUT
+      });
+      candidates = uniqueStrings(
+        [...String(html || "").matchAll(/href=["']([^"']*\/play\/[^"'?#]+)/gi)]
+          .map((match) => normalizeAnimeWorldPath(match[1]))
+          .filter(Boolean)
+      ).filter((path) => !checked.has(path));
+    } catch (error) {
+      console.error("[AnimeWorld] search failed:", error.message);
+      continue;
+    }
+
+    const batch = candidates.slice(0, 20);
+    batch.forEach((path) => checked.add(path));
+    const matches = await mapLimit(batch, 3, async (path) => {
+      const html = await fetchResource(buildWorldUrl(path), {
+        ttlMs: TTL.page,
+        cacheKey: `id-check:${path}`,
+        timeoutMs: FETCH_TIMEOUT
+      });
+      return pageHasTrackerId(html, malId, anilistId) ? path : null;
+    });
+    const paths = matches.filter((path) => typeof path === "string");
+    if (paths.length > 0) return uniqueStrings(paths);
+  }
+  return [];
+}
+
 function extractTmdbIdFromMappingPayload(mappingPayload) {
   const candidate =
     mappingPayload?.mappings?.ids?.tmdb ||
@@ -1060,6 +1131,9 @@ async function getStreams(id, type, season, episode, providerContext = null) {
       }
     }
 
+    if (animePaths.length === 0) {
+      animePaths = await searchAnimeWorldPathsByIds(mappingPayload);
+    }
     if (animePaths.length === 0) return [];
 
     const requestedEpisode = resolveEpisodeFromMappingPayload(mappingPayload, lookup.episode);
